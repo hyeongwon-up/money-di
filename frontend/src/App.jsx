@@ -20,7 +20,7 @@ const INITIAL_CATEGORIES = {
   STOCK: { label: '주식', emoji: '📈', color: '#f59e0b' },
   CRYPTO: { label: '암호화폐', emoji: '🪙', color: '#ef4444' },
   REAL_ESTATE: { label: '부동산', emoji: '🏠', color: '#8b5cf6' },
-  LOAN: { label: '대출/부채', emoji: '💸', color: '#ef4444', isLiability: true },
+  DEBT: { label: '대출/부채', emoji: '💸', color: '#ef4444', isLiability: true },
   OTHER: { label: '기타', emoji: '⚙️', color: '#64748b' }
 };
 
@@ -57,11 +57,26 @@ const App = () => {
     }
   };
 
+  // 부동산/대출 제외 플래그
+  const [excludeRealEstate, setExcludeRealEstate] = useState(false);
+
   // 플랫폼 분포 그래프용 카테고리 필터 상태
   const [selectedChartCategory, setSelectedChartCategory] = useState('TOTAL');
 
   // 상세 자산 현황 리스트 카테고리 필터 상태
   const [selectedListCategory, setSelectedListCategory] = useState('TOTAL');
+
+  // 차트용 history 보정 (부동산 제외시 현재 기준 부동산+부채 총합을 과거 12/25 이후 데이터에서 차감하여 유동자산 추이 파악)
+  const realEstateAndDebtTotal = assets
+    .filter(a => a.category === 'REAL_ESTATE' || a.category === 'DEBT')
+    .reduce((sum, a) => sum + Number(a.amount), 0);
+
+  const chartHistory = history.map(h => {
+    if (excludeRealEstate && new Date(h.recordedDate) >= new Date('2025-12-25')) {
+      return { ...h, totalAmount: h.totalAmount - realEstateAndDebtTotal };
+    }
+    return h;
+  });
 
   const fetchData = async () => {
     try {
@@ -121,28 +136,30 @@ const App = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 총 순자산 계산
-  const totalAmount = assets.reduce((acc, curr) => {
-    const amt = Number(curr.amount);
-    return INITIAL_CATEGORIES[curr.category]?.isLiability ? acc - amt : acc + amt;
-  }, 0);
+  // 부동산/대출 제외 필터링된 현재 자산 목록
+  const activeAssets = excludeRealEstate
+    ? assets.filter(a => a.category !== 'REAL_ESTATE' && a.category !== 'DEBT')
+    : assets;
+
+  // 총 순자산 계산 (DB에 부채가 이미 ─음수로 저장되어 있으므로 단순히 합산)
+  const totalAmount = activeAssets.reduce((acc, curr) => acc + Number(curr.amount), 0);
 
   // 카테고리별 비중 데이터
   const categorySummary = Object.keys(INITIAL_CATEGORIES).map(key => {
-    const total = assets.filter(a => a.category === key).reduce((sum, a) => sum + Number(a.amount), 0);
-    return { name: INITIAL_CATEGORIES[key].label, value: total, fill: INITIAL_CATEGORIES[key].color };
+    const total = activeAssets.filter(a => a.category === key).reduce((sum, a) => sum + Number(a.amount), 0);
+    return { name: INITIAL_CATEGORIES[key].label, value: Math.abs(total), fill: INITIAL_CATEGORIES[key].color };
   }).filter(item => item.value > 0);
 
   // 플랫폼별 분포 데이터 (선택된 카테고리에 따라 필터링)
   const filteredAssetsForChart = selectedChartCategory === 'TOTAL'
-    ? assets
-    : assets.filter(a => a.category === selectedChartCategory);
+    ? activeAssets
+    : activeAssets.filter(a => a.category === selectedChartCategory);
 
-  const categoryTotalForChart = filteredAssetsForChart.reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const categoryTotalForChart = filteredAssetsForChart.reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
 
   const platformSummary = filteredAssetsForChart.reduce((acc, curr) => {
     const p = curr.platform || '기타';
-    const amt = Number(curr.amount);
+    const amt = Math.abs(Number(curr.amount));
     const existing = acc.find(item => item.name === p);
     if (existing) existing.value += amt;
     else acc.push({ name: p, value: amt });
@@ -217,10 +234,16 @@ const App = () => {
       <main className="max-w-6xl mx-auto px-6 mt-8 space-y-8">
         {/* 상단 그래프 생략 (동일) */}
         <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-          <div className="flex items-center gap-2 mb-6"><TrendingUp className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">순 자산 변화 추이</h3></div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+            <div className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">순 자산 변화 추이</h3></div>
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
+              <input type="checkbox" className="w-4 h-4 text-blue-600 rounded cursor-pointer" checked={excludeRealEstate} onChange={(e) => setExcludeRealEstate(e.target.checked)} />
+              <span className="text-sm font-bold text-slate-700">부동산/대출 포함 여부</span>
+            </label>
+          </div>
           <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={history}>
+              <LineChart data={chartHistory}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="recordedDate" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(val) => `₩${(val / 100000000).toFixed(1)}억`} />
@@ -375,7 +398,7 @@ const App = () => {
                                   </div>
                                 </div>
                                 <div className="text-right flex flex-col items-end">
-                                  <p className={`text-xl font-black ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'text-red-600' : 'text-slate-900'}`}>{INITIAL_CATEGORIES[asset.category]?.isLiability ? '-' : ''} ₩ {Number(asset.amount).toLocaleString()}</p>
+                                  <p className={`text-xl font-black ${Number(asset.amount) < 0 ? 'text-red-600' : 'text-slate-900'}`}>₩ {Number(asset.amount).toLocaleString()}</p>
                                   <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEdit(asset)} className="p-2 text-slate-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete(asset.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></div>
                                 </div>
                               </div>
