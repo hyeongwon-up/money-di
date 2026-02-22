@@ -43,6 +43,16 @@ public class ThoughtController {
         return ThoughtResponseDto.fromEntity(savedThought);
     }
 
+    // 생각 수정
+    @PutMapping("/{id}")
+    public ThoughtResponseDto updateThought(@PathVariable Long id, @RequestBody ThoughtRequestDto request) {
+        Thought thought = thoughtRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Thought not found"));
+        thought.setContent(request.getContent());
+        Thought updatedThought = thoughtRepository.save(thought);
+        return ThoughtResponseDto.fromEntity(updatedThought);
+    }
+
     // 생각 삭제 (하위 생각까지 모두 삭제됨 - CascadeType.ALL)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteThought(@PathVariable Long id) {

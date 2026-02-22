@@ -3,8 +3,20 @@ import axios from 'axios';
 import { PlusCircle, Trash2, CornerDownRight, MessageSquare, ChevronRight, ChevronDown } from 'lucide-react';
 
 // Single recursive thought node component
-const ThoughtNode = ({ thought, onReply, onDelete }) => {
+const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editContent, setEditContent] = useState(thought.content);
+
+    const handleUpdate = async () => {
+        if (!editContent.trim()) return;
+        try {
+            await onUpdate(thought.id, editContent);
+            setIsEditing(false);
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     return (
         <div className="relative group">
@@ -26,28 +38,65 @@ const ThoughtNode = ({ thought, onReply, onDelete }) => {
 
                 {/* 생각 내용 영역 */}
                 <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
-                    <p className="text-slate-800 whitespace-pre-wrap leading-relaxed">
-                        {thought.content}
-                    </p>
+                    {isEditing ? (
+                        <div className="space-y-2">
+                            <textarea
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                rows={3}
+                                autoFocus
+                            />
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => {
+                                        setIsEditing(false);
+                                        setEditContent(thought.content);
+                                    }}
+                                    className="px-3 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-md"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={handleUpdate}
+                                    className="px-3 py-1 text-xs font-bold bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                                >
+                                    저장
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-slate-800 whitespace-pre-wrap leading-relaxed">
+                            {thought.content}
+                        </p>
+                    )}
 
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50">
-                        <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
-                            {new Date(thought.createdAt).toLocaleString()}
-                        </span>
-                        <button
-                            onClick={() => onReply(thought.id)}
-                            className="text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
-                        >
-                            <CornerDownRight className="w-3 h-3" />
-                            꼬리 무기 (답글)
-                        </button>
-                        <button
-                            onClick={() => onDelete(thought.id)}
-                            className="text-xs font-bold text-slate-400 hover:text-red-500 flex items-center gap-1 ml-auto transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                            <Trash2 className="w-3 h-3" />
-                        </button>
-                    </div>
+                    {!isEditing && (
+                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50">
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
+                                {new Date(thought.createdAt).toLocaleString()}
+                            </span>
+                            <button
+                                onClick={() => onReply(thought.id)}
+                                className="text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                            >
+                                <CornerDownRight className="w-3 h-3" />
+                                꼬리 무기 (답글)
+                            </button>
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="text-xs font-bold text-slate-400 hover:text-amber-500 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
+                            >
+                                수정
+                            </button>
+                            <button
+                                onClick={() => onDelete(thought.id)}
+                                className="text-xs font-bold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -60,6 +109,7 @@ const ThoughtNode = ({ thought, onReply, onDelete }) => {
                             thought={child}
                             onReply={onReply}
                             onDelete={onDelete}
+                            onUpdate={onUpdate}
                         />
                     ))}
                 </div>
@@ -76,7 +126,8 @@ const ThoughtsView = () => {
 
     const fetchThoughts = async () => {
         try {
-            const res = await axios.get('/api/thoughts');
+            // 캐시 방지를 위해 타임스탬프 추가
+            const res = await axios.get(`/api/thoughts?t=${new Date().getTime()}`);
             setThoughts(res.data);
         } catch (err) {
             console.error(err);
@@ -107,6 +158,17 @@ const ThoughtsView = () => {
         }
     };
 
+    const handleUpdate = async (id, content) => {
+        try {
+            await axios.put(`/api/thoughts/${id}`, { content });
+            await fetchThoughts();
+        } catch (err) {
+            console.error(err);
+            alert('수정에 실패했습니다.');
+            throw err;
+        }
+    };
+
     const handleDelete = async (id) => {
         if (!window.confirm('이 생각과 꼬리를 문 하위 모든 생각들이 삭제됩니다. 계속하시겠습니까?')) return;
         try {
@@ -114,6 +176,7 @@ const ThoughtsView = () => {
             await fetchThoughts();
         } catch (err) {
             console.error(err);
+            alert('삭제에 실패했습니다.');
         }
     };
 
@@ -135,6 +198,7 @@ const ThoughtsView = () => {
                         thought={thought}
                         onReply={setReplyingTo}
                         onDelete={handleDelete}
+                        onUpdate={handleUpdate}
                     />
                 ))}
 
