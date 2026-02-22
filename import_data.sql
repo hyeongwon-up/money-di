@@ -1,0 +1,12 @@
+DELETE FROM asset;
+DELETE FROM asset_history;
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-06-07', 81185947);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-06-28', 104109839);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-07-26', 110492941);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-08-27', 117890763);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-09-25', 129675368);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-10-26', 168709554);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-11-27', 181290505);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2025-12-25', 713359682);
+INSERT INTO asset_history (recorded_date, total_amount) VALUES ('2026-01-26', 714584784);
+INSERT INTO asset (name, amount, type, created_at) VALUES ('이월 총 자산', 714584784, 'CASH', '2026-01-26 00:00:00');
