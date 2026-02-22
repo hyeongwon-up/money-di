@@ -60,6 +60,9 @@ const App = () => {
   // 플랫폼 분포 그래프용 카테고리 필터 상태
   const [selectedChartCategory, setSelectedChartCategory] = useState('TOTAL');
 
+  // 상세 자산 현황 리스트 카테고리 필터 상태
+  const [selectedListCategory, setSelectedListCategory] = useState('TOTAL');
+
   const fetchData = async () => {
     try {
       const [assetRes, historyRes] = await Promise.all([
@@ -190,9 +193,6 @@ const App = () => {
       </div>
     );
   }
-
-  // 상세 자산 현황 카테고리 필터
-  const [selectedListCategory, setSelectedListCategory] = useState('TOTAL');
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-10">
