@@ -6,6 +6,10 @@ import {
 } from 'recharts';
 import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, History, Trash2, Edit2, Info, Building2, AlertCircle, LayoutGrid } from 'lucide-react';
 
+// API Base URL configuration
+const API_URL = import.meta.env.VITE_API_URL || '';
+axios.defaults.baseURL = API_URL;
+
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'];
 
 const INITIAL_CATEGORIES = {
