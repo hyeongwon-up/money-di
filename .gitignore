@@ -1,0 +1,47 @@
+# Operating System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE and Editors
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+*.swp
+*~
+
+# Java / Spring Boot / Gradle (Backend)
+backend/.gradle/
+backend/build/
+backend/bin/
+backend/out/
+*.class
+*.log
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# Node / React / Vite (Frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.eslintcache
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# General
+coverage/
+tmp/
