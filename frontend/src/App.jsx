@@ -200,9 +200,9 @@ const App = () => {
               <div className="bg-blue-600 p-2 rounded-lg"><Wallet className="text-white w-6 h-6" /></div>
               <h1 className="text-2xl font-black text-blue-900 tracking-tight">MONEY DI</h1>
             </div>
-            <div className="hidden sm:flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full border border-slate-200" title={isServerOnline ? '서버 정상 연결 중' : '서버 연결 실패'}>
+            <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-100 px-2 sm:px-3 py-1 rounded-full border border-slate-200" title={isServerOnline ? '서버 정상 연결 중' : '서버 연결 실패'}>
               <span className={`w-2 h-2 rounded-full ${isServerOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 animate-pulse'}`}></span>
-              <span className="text-xs font-bold text-slate-600">{isServerOnline ? 'API 연동됨' : '연결 끊김'}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-slate-600 hidden sm:inline">{isServerOnline ? 'API 연동됨' : '연결 끊김'}</span>
             </div>
           </div>
           <div className={`px-4 py-1 rounded-full text-sm font-bold ${totalAmount >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
