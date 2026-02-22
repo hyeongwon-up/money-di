@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/thoughts")
+@CrossOrigin(origins = "*")
 public class ThoughtController {
 
     private final ThoughtRepository thoughtRepository;
