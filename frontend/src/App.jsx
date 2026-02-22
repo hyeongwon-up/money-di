@@ -57,8 +57,8 @@ const App = () => {
     }
   };
 
-  // 부동산/대출 제외 플래그
-  const [excludeRealEstate, setExcludeRealEstate] = useState(false);
+  // 부동산/대출 포함 여부 플래그
+  const [includeRealEstate, setIncludeRealEstate] = useState(true);
 
   // 플랫폼 분포 그래프용 카테고리 필터 상태
   const [selectedChartCategory, setSelectedChartCategory] = useState('TOTAL');
@@ -72,7 +72,7 @@ const App = () => {
     .reduce((sum, a) => sum + Number(a.amount), 0);
 
   const chartHistory = history.map(h => {
-    if (excludeRealEstate && new Date(h.recordedDate) >= new Date('2025-12-25')) {
+    if (!includeRealEstate && new Date(h.recordedDate) >= new Date('2025-12-25')) {
       return { ...h, totalAmount: h.totalAmount - realEstateAndDebtTotal };
     }
     return h;
@@ -136,10 +136,10 @@ const App = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 부동산/대출 제외 필터링된 현재 자산 목록
-  const activeAssets = excludeRealEstate
-    ? assets.filter(a => a.category !== 'REAL_ESTATE' && a.category !== 'DEBT')
-    : assets;
+  // 부동산/대출 필터링된 현재 자산 목록
+  const activeAssets = includeRealEstate
+    ? assets
+    : assets.filter(a => a.category !== 'REAL_ESTATE' && a.category !== 'DEBT');
 
   // 총 순자산 계산 (DB에 부채가 이미 ─음수로 저장되어 있으므로 단순히 합산)
   const totalAmount = activeAssets.reduce((acc, curr) => acc + Number(curr.amount), 0);
@@ -237,7 +237,7 @@ const App = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">순 자산 변화 추이</h3></div>
             <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
-              <input type="checkbox" className="w-4 h-4 text-blue-600 rounded cursor-pointer" checked={excludeRealEstate} onChange={(e) => setExcludeRealEstate(e.target.checked)} />
+              <input type="checkbox" className="w-4 h-4 text-blue-600 rounded cursor-pointer" checked={includeRealEstate} onChange={(e) => setIncludeRealEstate(e.target.checked)} />
               <span className="text-sm font-bold text-slate-700">부동산/대출 포함 여부</span>
             </label>
           </div>
