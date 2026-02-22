@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
+import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar, LabelList
 } from 'recharts';
-import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, History, Trash2, Edit2, Info, Building2, AlertCircle, LayoutGrid } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, History, Trash2, Edit2, Info, Building2, AlertCircle, LayoutGrid, Lock } from 'lucide-react';
 
 // API Base URL configuration
 const API_URL = import.meta.env.VITE_API_URL || '';
 axios.defaults.baseURL = API_URL;
+
+const APP_PASSWORD = import.meta.env.VITE_APP_PASSWORD || '0153';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#64748b'];
 
@@ -29,12 +31,17 @@ const App = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isServerOnline, setIsServerOnline] = useState(true);
-  
+
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [loginError, setLoginError] = useState(false);
+
   // 이력 수정 핸들러 추가
   const handleHistoryUpdate = async (historyItem) => {
     const newAmount = prompt(`${historyItem.recordedDate}의 순 자산 금액을 수정하시겠습니까? (현재: ₩${historyItem.totalAmount.toLocaleString()})`, historyItem.totalAmount);
     if (newAmount === null || isNaN(newAmount)) return;
-    
+
     try {
       setLoading(true);
       await axios.put(`/api/assets/history/${historyItem.id}`, {
@@ -93,7 +100,7 @@ const App = () => {
       setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' });
       setEditingId(null);
       await fetchData();
-    } catch (error) { console.error('Failed to save asset', error); } 
+    } catch (error) { console.error('Failed to save asset', error); }
     finally { setLoading(false); }
   };
 
@@ -124,8 +131,8 @@ const App = () => {
   }).filter(item => item.value > 0);
 
   // 플랫폼별 분포 데이터 (선택된 카테고리에 따라 필터링)
-  const filteredAssetsForChart = selectedChartCategory === 'TOTAL' 
-    ? assets 
+  const filteredAssetsForChart = selectedChartCategory === 'TOTAL'
+    ? assets
     : assets.filter(a => a.category === selectedChartCategory);
 
   const categoryTotalForChart = filteredAssetsForChart.reduce((acc, curr) => acc + Number(curr.amount), 0);
@@ -141,6 +148,48 @@ const App = () => {
     ...item,
     percent: categoryTotalForChart > 0 ? ((item.value / categoryTotalForChart) * 100).toFixed(1) : 0
   })).sort((a, b) => b.value - a.value);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (passwordInput === APP_PASSWORD) {
+      setIsAuthenticated(true);
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+      setPasswordInput('');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
+        <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-lg border border-slate-100 text-center">
+          <div className="bg-blue-100 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Lock className="text-blue-600 w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-800 mb-2">MONEY DI</h1>
+          <p className="text-slate-500 mb-8 font-bold text-sm">자산 관리 시스템에 접속하려면 비밀번호를 입력하세요</p>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="비밀번호"
+                className={`w-full p-4 bg-slate-50 border rounded-xl text-center text-lg tracking-widest font-black focus:outline-none focus:ring-2 focus:ring-blue-500 ${loginError ? 'border-red-400 focus:ring-red-400' : 'border-slate-200'}`}
+                autoFocus
+              />
+              {loginError && <p className="text-red-500 text-xs font-bold mt-2">비밀번호가 올바르지 않습니다.</p>}
+            </div>
+            <button type="submit" className="w-full bg-blue-600 text-white font-bold p-4 rounded-xl shadow-lg hover:bg-blue-700 transition">
+              접속하기
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-10">
@@ -170,15 +219,15 @@ const App = () => {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={history}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="recordedDate" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} tickFormatter={(val) => `₩${(val/100000000).toFixed(1)}억`} />
+                <XAxis dataKey="recordedDate" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(val) => `₩${(val / 100000000).toFixed(1)}억`} />
                 <Tooltip formatter={(val) => `₩${Number(val).toLocaleString()}`} />
-                <Line 
-                  type="monotone" 
-                  dataKey="totalAmount" 
-                  stroke="#2563eb" 
-                  strokeWidth={3} 
-                  dot={{fill: '#2563eb', r: 6, stroke: '#fff', strokeWidth: 2, cursor: 'pointer'}} 
+                <Line
+                  type="monotone"
+                  dataKey="totalAmount"
+                  stroke="#2563eb"
+                  strokeWidth={3}
+                  dot={{ fill: '#2563eb', r: 6, stroke: '#fff', strokeWidth: 2, cursor: 'pointer' }}
                   activeDot={{ r: 8, stroke: '#2563eb', strokeWidth: 2, onClick: (e, payload) => handleHistoryUpdate(payload.payload) }}
                 />
               </LineChart>
@@ -209,21 +258,21 @@ const App = () => {
               {/* 카테고리 선택 필터 */}
               <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 md:pb-0">
                 <button onClick={() => setSelectedChartCategory('TOTAL')} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedChartCategory === 'TOTAL' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>전체</button>
-                {Object.entries(INITIAL_CATEGORIES).map(([key, {label}]) => (
+                {Object.entries(INITIAL_CATEGORIES).map(([key, { label }]) => (
                   <button key={key} onClick={() => setSelectedChartCategory(key)} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedChartCategory === key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{label}</button>
                 ))}
               </div>
             </div>
-            
+
             <div className="h-[300px]">
               {platformSummary.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={platformSummary} layout="vertical" margin={{ left: 20, right: 60 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={80} style={{fontSize: '12px', fontWeight: 'bold'}} />
-                    <Tooltip 
-                      cursor={{fill: 'transparent'}} 
+                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={80} style={{ fontSize: '12px', fontWeight: 'bold' }} />
+                    <Tooltip
+                      cursor={{ fill: 'transparent' }}
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           return (
@@ -239,11 +288,11 @@ const App = () => {
                     />
                     <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={25}>
                       {platformSummary.map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
-                      <LabelList 
-                        dataKey="percent" 
-                        position="right" 
+                      <LabelList
+                        dataKey="percent"
+                        position="right"
                         formatter={(val) => `${val}% (₩${(platformSummary.find(p => p.percent === val)?.value / 10000).toLocaleString()}만)`}
-                        style={{ fontSize: '11px', fontWeight: 'bold', fill: '#64748b' }} 
+                        style={{ fontSize: '11px', fontWeight: 'bold', fill: '#64748b' }}
                       />
                     </Bar>
                   </BarChart>
@@ -265,13 +314,13 @@ const App = () => {
               <h3 className="text-xl font-bold mb-6 flex items-center gap-2">{editingId ? <Edit2 className="w-5 h-5 text-orange-500" /> : <PlusCircle className="w-5 h-5 text-blue-600" />}{editingId ? '자산 정보 수정' : '새 자산 등록'}</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">카테고리</label><select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>{Object.entries(INITIAL_CATEGORIES).map(([key, {label, emoji}]) => <option key={key} value={key}>{emoji} {label}</option>)}</select></div>
-                  <div><label className="block text-xs font-bold text-slate-500 mb-1">플랫폼/금융사</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="예: 국민은행, 미래에셋" value={form.platform} onChange={e => setForm({...form, platform: e.target.value})} /></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">카테고리</label><select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{Object.entries(INITIAL_CATEGORIES).map(([key, { label, emoji }]) => <option key={key} value={key}>{emoji} {label}</option>)}</select></div>
+                  <div><label className="block text-xs font-bold text-slate-500 mb-1">플랫폼/금융사</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="예: 국민은행, 미래에셋" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })} /></div>
                 </div>
-                <div><label className="block text-xs font-bold text-slate-500 mb-1">자산 명</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" placeholder="예: 적금, 삼성전자" value={form.name} onChange={e => setForm({...form, name: e.target.value})} /></div>
-                <div><label className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-600" type="number" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} /></div>
-                <div><label className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label><textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm" value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
-                <div className="flex gap-2 pt-2">{editingId && <button type="button" onClick={() => {setEditingId(null); setForm({name:'', amount:'', category:'SAVINGS', platform:'', description:''})}} className="flex-1 bg-slate-200 p-4 rounded-xl font-bold">취소</button>}<button disabled={loading} className={`flex-[2] p-4 rounded-xl font-bold text-white shadow-lg ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>{loading ? '처리 중...' : editingId ? '수정 완료' : '등록하기'}</button></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">자산 명</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" placeholder="예: 적금, 삼성전자" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-600" type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
+                <div><label className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label><textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+                <div className="flex gap-2 pt-2">{editingId && <button type="button" onClick={() => { setEditingId(null); setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' }) }} className="flex-1 bg-slate-200 p-4 rounded-xl font-bold">취소</button>}<button disabled={loading} className={`flex-[2] p-4 rounded-xl font-bold text-white shadow-lg ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>{loading ? '처리 중...' : editingId ? '수정 완료' : '등록하기'}</button></div>
               </form>
             </div>
           </div>
