@@ -327,32 +327,48 @@ const App = () => {
           <div className="lg:col-span-8">
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[500px]">
               <div className="flex items-center gap-2 mb-6"><Info className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">상세 자산 현황</h3></div>
-              <div className="space-y-4">
-                {assets.map((asset) => (
-                  <div key={asset.id} className="group p-5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all">
-                    <div className="flex justify-between items-center">
-                      <div className="flex gap-4">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-50' : 'bg-slate-50'}`}>{INITIAL_CATEGORIES[asset.category]?.emoji}</div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{asset.platform || '기타'}</span>
-                            <h4 className="font-bold text-slate-800">{asset.name}</h4>
-                            {asset.previousAmount > 0 && asset.amount !== asset.previousAmount && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${asset.amount > asset.previousAmount ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                                {asset.amount > asset.previousAmount ? '▲' : '▼'} {Math.abs(((asset.amount - asset.previousAmount) / asset.previousAmount) * 100).toFixed(1)}%
-                              </span>
-                            )}
+              <div className="space-y-8">
+                {Object.entries(INITIAL_CATEGORIES).map(([catKey, catInfo]) => {
+                  const catAssets = assets.filter(a => a.category === catKey);
+                  if (catAssets.length === 0) return null;
+                  return (
+                    <div key={catKey}>
+                      <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2 border-slate-100 border-b pb-2">
+                        <span className="text-xl">{catInfo.emoji}</span> {catInfo.label}
+                        <span className="text-xs font-bold text-slate-400 ml-auto bg-slate-100 px-2 py-1 rounded-full">
+                          합계: ₩ {catAssets.reduce((sum, a) => sum + Number(a.amount), 0).toLocaleString()}
+                        </span>
+                      </h4>
+                      <div className="space-y-4">
+                        {catAssets.map((asset) => (
+                          <div key={asset.id} className="group p-5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all">
+                            <div className="flex justify-between items-center">
+                              <div className="flex gap-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-50' : 'bg-slate-50'}`}>{INITIAL_CATEGORIES[asset.category]?.emoji}</div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{asset.platform || '기타'}</span>
+                                    <h4 className="font-bold text-slate-800">{asset.name}</h4>
+                                    {asset.previousAmount > 0 && asset.amount !== asset.previousAmount && (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${asset.amount > asset.previousAmount ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                        {asset.amount > asset.previousAmount ? '▲' : '▼'} {Math.abs(((asset.amount - asset.previousAmount) / asset.previousAmount) * 100).toFixed(1)}%
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-slate-400 mt-1">{asset.description || '상세 정보 없음'}</p>
+                                </div>
+                              </div>
+                              <div className="text-right flex flex-col items-end">
+                                <p className={`text-xl font-black ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'text-red-600' : 'text-slate-900'}`}>{INITIAL_CATEGORIES[asset.category]?.isLiability ? '-' : ''} ₩ {Number(asset.amount).toLocaleString()}</p>
+                                <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEdit(asset)} className="p-2 text-slate-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete(asset.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></div>
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-sm text-slate-400 mt-1">{asset.description || '상세 정보 없음'}</p>
-                        </div>
-                      </div>
-                      <div className="text-right flex flex-col items-end">
-                        <p className={`text-xl font-black ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'text-red-600' : 'text-slate-900'}`}>{INITIAL_CATEGORIES[asset.category]?.isLiability ? '-' : ''} ₩ {Number(asset.amount).toLocaleString()}</p>
-                        <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEdit(asset)} className="p-2 text-slate-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete(asset.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
