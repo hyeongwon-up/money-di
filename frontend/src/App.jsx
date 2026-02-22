@@ -28,6 +28,7 @@ const App = () => {
   const [form, setForm] = useState({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' });
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isServerOnline, setIsServerOnline] = useState(true);
   
   // 이력 수정 핸들러 추가
   const handleHistoryUpdate = async (historyItem) => {
@@ -66,6 +67,21 @@ const App = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Health check polling
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        await axios.get('/api/health', { timeout: 5000 });
+        setIsServerOnline(true);
+      } catch (error) {
+        setIsServerOnline(false);
+      }
+    };
+    checkHealth(); // Initial check
+    const interval = setInterval(checkHealth, 30000); // 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -130,9 +146,15 @@ const App = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-10">
       <nav className="bg-white border-b px-8 py-4 sticky top-0 z-30 shadow-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg"><Wallet className="text-white w-6 h-6" /></div>
-            <h1 className="text-2xl font-black text-blue-900 tracking-tight">MONEY DI</h1>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="bg-blue-600 p-2 rounded-lg"><Wallet className="text-white w-6 h-6" /></div>
+              <h1 className="text-2xl font-black text-blue-900 tracking-tight">MONEY DI</h1>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full border border-slate-200" title={isServerOnline ? '서버 정상 연결 중' : '서버 연결 실패'}>
+              <span className={`w-2 h-2 rounded-full ${isServerOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500 animate-pulse'}`}></span>
+              <span className="text-xs font-bold text-slate-600">{isServerOnline ? 'API 연동됨' : '연결 끊김'}</span>
+            </div>
           </div>
           <div className={`px-4 py-1 rounded-full text-sm font-bold ${totalAmount >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
             순 자산: ₩ {totalAmount.toLocaleString()}
