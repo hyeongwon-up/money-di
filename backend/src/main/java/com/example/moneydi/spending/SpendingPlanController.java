@@ -7,6 +7,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/spending-plans")
+@CrossOrigin(origins = "*")
 public class SpendingPlanController {
 
     private final SpendingPlanRepository spendingPlanRepository;
