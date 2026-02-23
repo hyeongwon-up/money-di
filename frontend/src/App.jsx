@@ -4,8 +4,9 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar, LabelList
 } from 'recharts';
-import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, History, Trash2, Edit2, Info, Building2, AlertCircle, LayoutGrid, Lock, Lightbulb } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, History, Trash2, Edit2, Info, Building2, AlertCircle, LayoutGrid, Lock, Lightbulb, Calendar } from 'lucide-react';
 import ThoughtsView from './components/ThoughtsView';
+import SpendingPlanView from './components/SpendingPlanView';
 
 // API Base URL configuration
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -32,7 +33,7 @@ const App = () => {
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isServerOnline, setIsServerOnline] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'thoughts'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'thoughts' | 'spending'
 
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -241,6 +242,12 @@ const App = () => {
               >
                 <Lightbulb className="w-4 h-4" /> 생각 정리
               </button>
+              <button
+                onClick={() => setActiveTab('spending')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'spending' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                <Calendar className="w-4 h-4" /> 지출 계획
+              </button>
             </div>
 
             {activeTab === 'dashboard' && (
@@ -256,6 +263,10 @@ const App = () => {
       {activeTab === 'thoughts' ? (
         <div className="pt-8 px-6">
           <ThoughtsView />
+        </div>
+      ) : activeTab === 'spending' ? (
+        <div className="pt-8 px-6">
+          <SpendingPlanView />
         </div>
       ) : (
         <main className="max-w-6xl mx-auto px-6 mt-8 space-y-8">
