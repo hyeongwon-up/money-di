@@ -40,10 +40,14 @@ const App = () => {
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
 
-  // 이력 수정 핸들러 추가
+  // 이력 수정 핸들러
   const handleHistoryUpdate = async (historyItem) => {
-    const newAmount = prompt(`${historyItem.recordedDate}의 순 자산 금액을 수정하시겠습니까? (현재: ₩${historyItem.totalAmount.toLocaleString()})`, historyItem.totalAmount);
-    if (newAmount === null || isNaN(newAmount)) return;
+    const newAmount = prompt(
+      `${historyItem.recordedDate}의 순 자산 금액을 수정하시겠습니까?\n(현재: ₩${historyItem.totalAmount.toLocaleString()})`, 
+      historyItem.totalAmount
+    );
+    
+    if (newAmount === null || newAmount === "" || isNaN(newAmount)) return;
 
     try {
       setLoading(true);
@@ -51,7 +55,9 @@ const App = () => {
         ...historyItem,
         totalAmount: parseInt(newAmount, 10)
       });
+      // 데이터 즉시 동기화
       await fetchData();
+      alert('성공적으로 수정되었습니다.');
     } catch (error) {
       console.error('Failed to update history', error);
       alert('이력 수정에 실패했습니다.');
