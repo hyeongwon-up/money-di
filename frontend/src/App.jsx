@@ -136,7 +136,6 @@ const App = () => {
   const handleEdit = (asset) => {
     setEditingId(asset.id);
     setForm({ name: asset.name, amount: asset.amount, category: asset.category, platform: asset.platform || '', description: asset.description || '' });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // 부동산/대출 필터링된 현재 자산 목록
@@ -418,28 +417,54 @@ const App = () => {
                           </h4>
                           <div className="space-y-4">
                             {catAssets.map((asset) => (
-                              <div key={asset.id} className="group p-5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all">
-                                <div className="flex justify-between items-center">
-                                  <div className="flex gap-4">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-50' : 'bg-slate-50'}`}>{INITIAL_CATEGORIES[asset.category]?.emoji}</div>
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{asset.platform || '기타'}</span>
-                                        <h4 className="font-bold text-slate-800">{asset.name}</h4>
-                                        {asset.previousAmount > 0 && asset.amount !== asset.previousAmount && (
-                                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${asset.amount > asset.previousAmount ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                                            {asset.amount > asset.previousAmount ? '▲' : '▼'} {Math.abs(((asset.amount - asset.previousAmount) / asset.previousAmount) * 100).toFixed(1)}%
-                                          </span>
-                                        )}
+                              <div key={asset.id}>
+                                {editingId === asset.id ? (
+                                  <div className="p-5 bg-blue-50 border-2 border-blue-400 rounded-2xl shadow-inner ring-4 ring-blue-50 ring-opacity-50">
+                                    <div className="flex items-center gap-2 mb-4 text-blue-700">
+                                      <Edit2 className="w-4 h-4" />
+                                      <span className="text-sm font-black">자산 정보 수정</span>
+                                    </div>
+                                    <form onSubmit={handleSubmit} className="space-y-4">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="block text-[10px] font-bold text-blue-600 mb-1">카테고리</label><select className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{Object.entries(INITIAL_CATEGORIES).map(([key, { label, emoji }]) => <option key={key} value={key}>{emoji} {label}</option>)}</select></div>
+                                        <div><label className="block text-[10px] font-bold text-blue-600 mb-1">플랫폼</label><input className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })} /></div>
                                       </div>
-                                      <p className="text-sm text-slate-400 mt-1">{asset.description || '상세 정보 없음'}</p>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><label className="block text-[10px] font-bold text-blue-600 mb-1">자산 명</label><input className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+                                        <div><label className="block text-[10px] font-bold text-blue-600 mb-1">금액 (원)</label><input className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-sm font-black text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none" type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
+                                      </div>
+                                      <div><label className="block text-[10px] font-bold text-blue-600 mb-1">상세 설명</label><textarea className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-xs h-16 focus:ring-2 focus:ring-blue-500 outline-none" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="설명 입력..." /></div>
+                                      <div className="flex gap-2 justify-end pt-2">
+                                        <button type="button" onClick={() => { setEditingId(null); setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' }) }} className="px-5 py-2.5 bg-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-300 transition-colors">취소</button>
+                                        <button type="submit" disabled={loading} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95">{loading ? '처리 중...' : '수정 완료'}</button>
+                                      </div>
+                                    </form>
+                                  </div>
+                                ) : (
+                                  <div className="group p-5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all">
+                                    <div className="flex justify-between items-center">
+                                      <div className="flex gap-4">
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-50' : 'bg-slate-50'}`}>{INITIAL_CATEGORIES[asset.category]?.emoji}</div>
+                                        <div>
+                                          <div className="flex items-center gap-2">
+                                            <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{asset.platform || '기타'}</span>
+                                            <h4 className="font-bold text-slate-800">{asset.name}</h4>
+                                            {asset.previousAmount > 0 && asset.amount !== asset.previousAmount && (
+                                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${asset.amount > asset.previousAmount ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                {asset.amount > asset.previousAmount ? '▲' : '▼'} {Math.abs(((asset.amount - asset.previousAmount) / asset.previousAmount) * 100).toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-sm text-slate-400 mt-1">{asset.description || '상세 정보 없음'}</p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right flex flex-col items-end">
+                                        <p className={`text-xl font-black ${Number(asset.amount) < 0 ? 'text-red-600' : 'text-slate-900'}`}>₩ {Number(asset.amount).toLocaleString()}</p>
+                                        <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEdit(asset)} className="p-2 text-slate-400 hover:text-blue-600" title="수정"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete(asset.id)} className="p-2 text-slate-400 hover:text-red-600" title="삭제"><Trash2 className="w-4 h-4" /></button></div>
+                                      </div>
                                     </div>
                                   </div>
-                                  <div className="text-right flex flex-col items-end">
-                                    <p className={`text-xl font-black ${Number(asset.amount) < 0 ? 'text-red-600' : 'text-slate-900'}`}>₩ {Number(asset.amount).toLocaleString()}</p>
-                                    <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => handleEdit(asset)} className="p-2 text-slate-400 hover:text-blue-600"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete(asset.id)} className="p-2 text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button></div>
-                                  </div>
-                                </div>
+                                )}
                               </div>
                             ))}
                           </div>
