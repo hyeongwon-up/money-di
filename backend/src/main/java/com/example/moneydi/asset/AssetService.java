@@ -49,13 +49,31 @@ public class AssetService {
     public List<Asset> getAllAssets() {
         return assetRepository.findAll();
     }
-    
-    // ... (중략)
+
+    @Transactional(readOnly = true)
+    public List<AssetHistory> getAssetHistory() {
+        return assetHistoryRepository.findAll();
+    }
+
+    public AssetHistory updateAssetHistory(Long id, AssetHistory history) {
+        AssetHistory existing = assetHistoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("History not found with id " + id));
+        existing.setTotalAmount(history.getTotalAmount());
+        if (history.getRecordedDate() != null) {
+            existing.setRecordedDate(history.getRecordedDate());
+        }
+        return assetHistoryRepository.save(existing);
+    }
+
+    public void deleteAssetHistory(Long id) {
+        assetHistoryRepository.deleteById(id);
+    }
 
     public Asset updateAsset(Long id, Asset assetDetails) {
         Asset asset = assetRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Asset not found with id " + id));
         
+        // 금액이 변경된 경우 이전 금액으로 백업 (변동률 계산용)
         if (asset.getAmount() != null && !asset.getAmount().equals(assetDetails.getAmount())) {
             asset.setPreviousAmount(asset.getAmount());
         }
@@ -89,4 +107,12 @@ public class AssetService {
         refreshAllHistory();
     }
 
+    private void recordItemHistory(Asset asset) {
+        AssetItemHistory itemHistory = AssetItemHistory.builder()
+                .assetId(asset.getId())
+                .amount(asset.getAmount())
+                .recordedDate(java.time.LocalDate.now())
+                .build();
+        assetItemHistoryRepository.save(itemHistory);
+    }
 }
