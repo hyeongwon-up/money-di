@@ -69,13 +69,13 @@ const App = () => {
   // 상세 자산 현황 리스트 카테고리 필터 상태
   const [selectedListCategory, setSelectedListCategory] = useState('TOTAL');
 
-  // 차트용 history 보정 (부동산 제외시 현재 기준 부동산+부채 총합을 과거 12/25 이후 데이터에서 차감하여 유동자산 추이 파악)
+  // 차트용 history 보정 (부동산/부채 제외 시 현재 부동산+부채 순가치를 차감하여 유동자산 추이 파악)
   const realEstateAndDebtTotal = assets
-    .filter(a => a.category === 'REAL_ESTATE' || a.category === 'DEBT')
+    .filter(a => a.category === 'REAL_ESTATE' || a.category === 'DEBT' || a.category === 'LOAN')
     .reduce((sum, a) => sum + Number(a.amount), 0);
 
   const chartHistory = history.map(h => {
-    if (!includeRealEstate && new Date(h.recordedDate) >= new Date('2025-12-25')) {
+    if (!includeRealEstate) {
       return { ...h, totalAmount: h.totalAmount - realEstateAndDebtTotal };
     }
     return h;
@@ -141,7 +141,7 @@ const App = () => {
   // 부동산/대출 필터링된 현재 자산 목록
   const activeAssets = includeRealEstate
     ? assets
-    : assets.filter(a => a.category !== 'REAL_ESTATE' && a.category !== 'DEBT');
+    : assets.filter(a => a.category !== 'REAL_ESTATE' && a.category !== 'DEBT' && a.category !== 'LOAN');
 
   // 총 순자산 계산 (DB에 부채가 이미 ─음수로 저장되어 있으므로 단순히 합산)
   const totalAmount = activeAssets.reduce((acc, curr) => acc + Number(curr.amount), 0);
