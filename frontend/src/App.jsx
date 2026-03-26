@@ -317,7 +317,12 @@ const App = () => {
 
             <div className="lg:col-span-8 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                <h3 className="font-bold text-lg flex items-center gap-2"><Building2 className="w-5 h-5 text-blue-600" /> 플랫폼별 상세 분포</h3>
+                <div className="flex flex-col gap-1">
+                  <h3 className="font-bold text-lg flex items-center gap-2"><Building2 className="w-5 h-5 text-blue-600" /> 플랫폼별 상세 분포</h3>
+                  <p className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md w-fit">
+                    선택 합계: ₩ {categoryTotalForChart.toLocaleString()}
+                  </p>
+                </div>
                 {/* 카테고리 선택 필터 */}
                 <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 md:pb-0">
                   <button onClick={() => setSelectedChartCategory('TOTAL')} className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${selectedChartCategory === 'TOTAL' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>전체</button>
