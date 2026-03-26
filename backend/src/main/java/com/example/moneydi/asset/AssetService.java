@@ -16,6 +16,7 @@ public class AssetService {
 
     public Asset saveAsset(Asset asset) {
         if (asset.getAmount() == null) asset.setAmount(0L);
+        normalizeAmount(asset);
         Asset saved = assetRepository.save(asset);
         updateHistory();
         recordItemHistory(saved);
@@ -60,11 +61,23 @@ public class AssetService {
         asset.setCategory(assetDetails.getCategory());
         asset.setPlatform(assetDetails.getPlatform());
         asset.setDescription(assetDetails.getDescription());
+        
+        normalizeAmount(asset);
         Asset updated = assetRepository.save(asset);
         
         updateHistory();
         recordItemHistory(updated);
         return updated;
+    }
+
+    private void normalizeAmount(Asset asset) {
+        if (asset.getAmount() != null && ("LOAN".equals(asset.getCategory()) || "DEBT".equals(asset.getCategory()))) {
+            // 부채인 경우 무조건 음수로 저장
+            asset.setAmount(-Math.abs(asset.getAmount()));
+        } else if (asset.getAmount() != null) {
+            // 일반 자산인 경우 무조건 양수로 저장 (실수로 음수 입력 방지)
+            asset.setAmount(Math.abs(asset.getAmount()));
+        }
     }
 
     public void deleteAsset(Long id) {
@@ -84,11 +97,7 @@ public class AssetService {
     private void updateHistory() {
         List<Asset> allAssets = assetRepository.findAll();
         long totalAmount = allAssets.stream()
-                .mapToLong(a -> {
-                    long amt = a.getAmount() != null ? a.getAmount() : 0L;
-                    // 대출(LOAN) 또는 부채(DEBT) 카테고리인 경우 차감(-) 처리
-                    return ("LOAN".equals(a.getCategory()) || "DEBT".equals(a.getCategory())) ? -amt : amt;
-                })
+                .mapToLong(a -> a.getAmount() != null ? a.getAmount() : 0L)
                 .sum();
 
         java.time.LocalDate today = java.time.LocalDate.now();
