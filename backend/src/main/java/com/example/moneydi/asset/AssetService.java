@@ -2,11 +2,13 @@ package com.example.moneydi.asset;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class AssetService {
     private final AssetRepository assetRepository;
     private final AssetHistoryRepository assetHistoryRepository;
@@ -20,10 +22,12 @@ public class AssetService {
         return saved;
     }
 
+    @Transactional(readOnly = true)
     public List<Asset> getAllAssets() {
         return assetRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<AssetHistory> getAssetHistory() {
         return assetHistoryRepository.findAll();
     }
@@ -47,14 +51,14 @@ public class AssetService {
                 .orElseThrow(() -> new RuntimeException("Asset not found with id " + id));
         
         // 금액이 변경된 경우 이전 금액으로 백업 (변동률 계산용)
-        if (!asset.getAmount().equals(assetDetails.getAmount())) {
+        if (asset.getAmount() != null && !asset.getAmount().equals(assetDetails.getAmount())) {
             asset.setPreviousAmount(asset.getAmount());
         }
 
         asset.setName(assetDetails.getName());
         asset.setAmount(assetDetails.getAmount());
         asset.setCategory(assetDetails.getCategory());
-        asset.setPlatform(assetDetails.getPlatform()); // 플랫폼 업데이트 추가
+        asset.setPlatform(assetDetails.getPlatform());
         asset.setDescription(assetDetails.getDescription());
         Asset updated = assetRepository.save(asset);
         
@@ -82,8 +86,8 @@ public class AssetService {
         long totalAmount = allAssets.stream()
                 .mapToLong(a -> {
                     long amt = a.getAmount() != null ? a.getAmount() : 0L;
-                    // 대출(LOAN) 카테고리인 경우 차감(-) 처리
-                    return "LOAN".equals(a.getCategory()) ? -amt : amt;
+                    // 대출(LOAN) 또는 부채(DEBT) 카테고리인 경우 차감(-) 처리
+                    return ("LOAN".equals(a.getCategory()) || "DEBT".equals(a.getCategory())) ? -amt : amt;
                 })
                 .sum();
 
