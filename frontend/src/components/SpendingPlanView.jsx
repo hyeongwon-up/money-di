@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Calendar, PlusCircle, Trash2, Edit2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { spendingApi } from '../api/spendingApi';
+import { Calendar, PlusCircle, Trash2, Edit2, CheckCircle2, Clock } from 'lucide-react';
 
 const SpendingPlanView = () => {
     const [plans, setPlans] = useState([]);
@@ -10,7 +10,7 @@ const SpendingPlanView = () => {
 
     const fetchPlans = async () => {
         try {
-            const res = await axios.get('/api/spending-plans');
+            const res = await spendingApi.getPlans();
             setPlans(res.data);
         } catch (err) {
             console.error(err);
@@ -29,9 +29,9 @@ const SpendingPlanView = () => {
 
         try {
             if (editingId) {
-                await axios.put(`/api/spending-plans/${editingId}`, form);
+                await spendingApi.updatePlan(editingId, form);
             } else {
-                await axios.post('/api/spending-plans', form);
+                await spendingApi.createPlan(form);
             }
             setForm({ title: '', amount: '', dueDate: '', description: '', isPaid: false });
             setEditingId(null);
@@ -45,7 +45,7 @@ const SpendingPlanView = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('정말 삭제하시겠습니까?')) return;
         try {
-            await axios.delete(`/api/spending-plans/${id}`);
+            await spendingApi.deletePlan(id);
             fetchPlans();
         } catch (err) {
             console.error(err);
@@ -66,7 +66,7 @@ const SpendingPlanView = () => {
 
     const togglePaid = async (plan) => {
         try {
-            await axios.put(`/api/spending-plans/${plan.id}`, {
+            await spendingApi.updatePlan(plan.id, {
                 ...plan,
                 isPaid: !plan.paid
             });
@@ -106,7 +106,6 @@ const SpendingPlanView = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* 입력 폼 */}
                 <div className="lg:col-span-4">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 sticky top-24">
                         <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
@@ -184,7 +183,6 @@ const SpendingPlanView = () => {
                     </div>
                 </div>
 
-                {/* 목록 */}
                 <div className="lg:col-span-8">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[500px]">
                         <h3 className="text-xl font-bold mb-6 flex items-center gap-2">

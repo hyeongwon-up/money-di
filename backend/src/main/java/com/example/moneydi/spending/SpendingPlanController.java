@@ -1,5 +1,6 @@
 package com.example.moneydi.spending;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -8,48 +9,33 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/spending-plans")
 @CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class SpendingPlanController {
 
-    private final SpendingPlanRepository spendingPlanRepository;
-
-    public SpendingPlanController(SpendingPlanRepository spendingPlanRepository) {
-        this.spendingPlanRepository = spendingPlanRepository;
-    }
+    private final SpendingPlanService spendingPlanService;
 
     @GetMapping
     public List<SpendingPlan> getAll() {
-        return spendingPlanRepository.findAllByOrderByDueDateAsc();
+        return spendingPlanService.getAllPlans();
     }
 
     @PostMapping
     public SpendingPlan create(@RequestBody SpendingPlanRequestDto request) {
-        SpendingPlan plan = new SpendingPlan();
-        plan.setTitle(request.getTitle());
-        plan.setAmount(request.getAmount());
-        plan.setDueDate(request.getDueDate());
-        plan.setDescription(request.getDescription());
-        plan.setPaid(request.isPaid());
-        return spendingPlanRepository.save(plan);
+        return spendingPlanService.createPlan(request);
     }
 
     @PutMapping("/{id}")
     public SpendingPlan update(@PathVariable Long id, @RequestBody SpendingPlanRequestDto request) {
-        SpendingPlan plan = spendingPlanRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Spending plan not found"));
-        plan.setTitle(request.getTitle());
-        plan.setAmount(request.getAmount());
-        plan.setDueDate(request.getDueDate());
-        plan.setDescription(request.getDescription());
-        plan.setPaid(request.isPaid());
-        return spendingPlanRepository.save(plan);
+        return spendingPlanService.updatePlan(id, request);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (!spendingPlanRepository.existsById(id)) {
+        try {
+            spendingPlanService.deletePlan(id);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }
-        spendingPlanRepository.deleteById(id);
-        return ResponseEntity.ok().build();
     }
 }

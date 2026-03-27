@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { thoughtApi } from '../api/thoughtApi';
 import { PlusCircle, Trash2, CornerDownRight, MessageSquare, ChevronRight, ChevronDown } from 'lucide-react';
 
 // Single recursive thought node component
@@ -126,8 +126,7 @@ const ThoughtsView = () => {
 
     const fetchThoughts = async () => {
         try {
-            // 캐시 방지를 위해 타임스탬프 추가
-            const res = await axios.get(`/api/thoughts?t=${new Date().getTime()}`);
+            const res = await thoughtApi.getThoughts();
             setThoughts(res.data);
         } catch (err) {
             console.error(err);
@@ -145,7 +144,7 @@ const ThoughtsView = () => {
         if (!newContent.trim()) return;
 
         try {
-            await axios.post('/api/thoughts', {
+            await thoughtApi.createThought({
                 content: newContent,
                 parentId: replyingTo
             });
@@ -160,7 +159,7 @@ const ThoughtsView = () => {
 
     const handleUpdate = async (id, content) => {
         try {
-            await axios.put(`/api/thoughts/${id}`, { content });
+            await thoughtApi.updateThought(id, { content });
             await fetchThoughts();
         } catch (err) {
             console.error(err);
@@ -172,7 +171,7 @@ const ThoughtsView = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('이 생각과 꼬리를 문 하위 모든 생각들이 삭제됩니다. 계속하시겠습니까?')) return;
         try {
-            await axios.delete(`/api/thoughts/${id}`);
+            await thoughtApi.deleteThought(id);
             await fetchThoughts();
         } catch (err) {
             console.error(err);
@@ -210,7 +209,6 @@ const ThoughtsView = () => {
                 )}
             </div>
 
-            {/* 새 글 작성 폼 (고정 바닥 또는 인라인) */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40">
                 <div className="max-w-4xl mx-auto">
                     {replyingTo && (
