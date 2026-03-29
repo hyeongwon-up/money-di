@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar, LabelList
 } from 'recharts';
-import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, Trash2, Edit2, Info, Building2, LayoutGrid, Lock, Lightbulb, Calendar } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, Trash2, Edit2, Info, Building2, LayoutGrid, Lock, Lightbulb, Calendar, DollarSign } from 'lucide-react';
 import ThoughtsView from './components/ThoughtsView';
 import SpendingPlanView from './components/SpendingPlanView';
 import { useAssets } from './hooks/useAssets';
@@ -20,7 +20,7 @@ const App = () => {
     refreshAssets
   } = useAssets();
 
-  const [form, setForm] = useState({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' });
+  const [form, setForm] = useState({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true });
   const [editingId, setEditingId] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'thoughts' | 'spending'
 
@@ -82,7 +82,7 @@ const App = () => {
     try {
       if (editingId) await assetApi.updateAsset(editingId, form);
       else await assetApi.saveAsset(form);
-      setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' });
+      setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true });
       setEditingId(null);
       await refreshAssets();
     } catch (error) { console.error('Failed to save asset', error); }
@@ -99,7 +99,7 @@ const App = () => {
 
   const handleEdit = (asset) => {
     setEditingId(asset.id);
-    setForm({ name: asset.name, amount: asset.amount, category: asset.category, platform: asset.platform || '', description: asset.description || '' });
+    setForm({ name: asset.name, amount: asset.amount, category: asset.category, platform: asset.platform || '', description: asset.description || '', liquid: asset.liquid });
   };
 
   // 부동산/대출 필터링된 현재 자산 목록
@@ -109,6 +109,9 @@ const App = () => {
 
   // 총 순자산 계산 (DB에 부채가 이미 ─음수로 저장되어 있으므로 단순히 합산)
   const totalAmount = activeAssets.reduce((acc, curr) => acc + Number(curr.amount), 0);
+
+  // 현금성 자산 총액 계산
+  const liquidTotal = assets.filter(a => a.liquid).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
   // 카테고리별 비중 데이터
   const categorySummary = Object.keys(INITIAL_CATEGORIES).map(key => {
@@ -214,15 +217,21 @@ const App = () => {
             </div>
 
             {activeTab === 'dashboard' && (
-              <div className={`px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-slate-100 ${totalAmount >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                순 자산: ₩ {totalAmount.toLocaleString()}
+              <div className="flex gap-2">
+                <div className={`flex flex-col items-end px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-slate-100 ${totalAmount >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                  <span className="text-[10px] font-black uppercase opacity-60">순 자산</span>
+                  <span>₩ {totalAmount.toLocaleString()}</span>
+                </div>
+                <div className={`flex flex-col items-end px-4 py-1.5 rounded-full text-sm font-bold shadow-sm border border-slate-100 ${liquidTotal >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                  <span className="text-[10px] font-black uppercase opacity-60">현금성 자산</span>
+                  <span>₩ {liquidTotal.toLocaleString()}</span>
+                </div>
               </div>
             )}
           </div>
         </div>
       </nav>
 
-      {/* 탭 내용 라우팅 */}
       {activeTab === 'thoughts' ? (
         <div className="pt-8 px-6">
           <ThoughtsView />
@@ -348,7 +357,19 @@ const App = () => {
                   <div><label className="block text-xs font-bold text-slate-500 mb-1">자산 명</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" placeholder="예: 적금, 삼성전자" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
                   <div><label className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-600" type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
                   <div><label className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label><textarea className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-                  <div className="flex gap-2 pt-2">{editingId && <button type="button" onClick={() => { setEditingId(null); setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' }) }} className="flex-1 bg-slate-200 p-4 rounded-xl font-bold">취소</button>}<button disabled={loading} className={`flex-[2] p-4 rounded-xl font-bold text-white shadow-lg ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>{loading ? '처리 중...' : editingId ? '수정 완료' : '등록하기'}</button></div>
+                  <div className="flex items-center gap-2 pt-2 px-1">
+                    <input
+                      id="isLiquid"
+                      type="checkbox"
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                      checked={form.liquid}
+                      onChange={e => setForm({ ...form, liquid: e.target.checked })}
+                    />
+                    <label htmlFor="isLiquid" className="text-sm font-bold text-slate-600 cursor-pointer select-none flex items-center gap-1">
+                      <DollarSign className="w-3 h-3" /> 현금화 가능 자산
+                    </label>
+                  </div>
+                  <div className="flex gap-2 pt-2">{editingId && <button type="button" onClick={() => { setEditingId(null); setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true }) }} className="flex-1 bg-slate-200 p-4 rounded-xl font-bold">취소</button>}<button disabled={loading} className={`flex-[2] p-4 rounded-xl font-bold text-white shadow-lg ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>{loading ? '처리 중...' : editingId ? '수정 완료' : '등록하기'}</button></div>
                 </form>
               </div>
             </div>
@@ -397,17 +418,34 @@ const App = () => {
                                         <div><label className="block text-[10px] font-bold text-blue-600 mb-1">금액 (원)</label><input className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-sm font-black text-blue-700 focus:ring-2 focus:ring-blue-500 outline-none" type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
                                       </div>
                                       <div><label className="block text-[10px] font-bold text-blue-600 mb-1">상세 설명</label><textarea className="w-full p-2.5 bg-white border border-blue-200 rounded-xl text-xs h-16 focus:ring-2 focus:ring-blue-500 outline-none" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="설명 입력..." /></div>
+                                      <div className="flex items-center gap-2 pt-2 px-1">
+                                        <input
+                                          id="isLiquidEdit"
+                                          type="checkbox"
+                                          className="w-4 h-4 text-blue-600 rounded border-blue-200 focus:ring-blue-500 cursor-pointer"
+                                          checked={form.liquid}
+                                          onChange={e => setForm({ ...form, liquid: e.target.checked })}
+                                        />
+                                        <label htmlFor="isLiquidEdit" className="text-sm font-bold text-blue-600 cursor-pointer select-none">현금화 가능 자산</label>
+                                      </div>
                                       <div className="flex gap-2 justify-end pt-2">
-                                        <button type="button" onClick={() => { setEditingId(null); setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '' }) }} className="px-5 py-2.5 bg-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-300 transition-colors">취소</button>
+                                        <button type="button" onClick={() => { setEditingId(null); setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true }) }} className="px-5 py-2.5 bg-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-300 transition-colors">취소</button>
                                         <button type="submit" disabled={loading} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95">{loading ? '처리 중...' : '수정 완료'}</button>
                                       </div>
                                     </form>
                                   </div>
                                 ) : (
-                                  <div className="group p-5 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 hover:shadow-md transition-all">
+                                  <div className={`group p-5 bg-white border rounded-2xl hover:shadow-md transition-all ${asset.liquid ? 'border-emerald-100 bg-emerald-50/10' : 'border-slate-100'}`}>
                                     <div className="flex justify-between items-center">
                                       <div className="flex gap-4">
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-50' : 'bg-slate-50'}`}>{INITIAL_CATEGORIES[asset.category]?.emoji}</div>
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl relative ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-50' : 'bg-slate-50'}`}>
+                                          {INITIAL_CATEGORIES[asset.category]?.emoji}
+                                          {asset.liquid && (
+                                            <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-sm border border-white">
+                                              <DollarSign className="w-2.5 h-2.5" />
+                                            </div>
+                                          )}
+                                        </div>
                                         <div>
                                           <div className="flex items-center gap-2">
                                             <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{asset.platform || '기타'}</span>
