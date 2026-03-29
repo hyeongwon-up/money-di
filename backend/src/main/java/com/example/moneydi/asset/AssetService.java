@@ -83,6 +83,7 @@ public class AssetService {
         asset.setCategory(assetDetails.getCategory());
         asset.setPlatform(assetDetails.getPlatform());
         asset.setDescription(assetDetails.getDescription());
+        asset.setLiquid(assetDetails.isLiquid());
         
         normalizeAmount(asset);
         Asset updated = assetRepository.save(asset);

@@ -23,5 +23,6 @@ public class Asset {
     private String category;    // SAVINGS, INSTALLMENT, STOCK, CRYPTO, REAL_ESTATE
     private String platform;    // 플랫폼(은행, 증권사 등)
     private String description; // 상세 메모
+    private boolean liquid = true; // 현금화 가능 여부
     private LocalDateTime createdAt = LocalDateTime.now();
 }

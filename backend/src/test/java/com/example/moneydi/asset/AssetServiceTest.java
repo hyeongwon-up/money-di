@@ -97,6 +97,31 @@ class AssetServiceTest {
     }
 
     @Test
+    @DisplayName("자산 정보 수정 시 liquid 필드가 정상적으로 업데이트되어야 한다")
+    void updateAsset_shouldUpdateLiquidField() {
+        // given
+        Long assetId = 1L;
+        Asset existingAsset = new Asset();
+        existingAsset.setId(assetId);
+        existingAsset.setLiquid(true);
+
+        Asset assetDetails = new Asset();
+        assetDetails.setLiquid(false);
+        assetDetails.setName("수정된 자산");
+        assetDetails.setCategory("SAVINGS");
+        assetDetails.setAmount(1000L);
+
+        when(assetRepository.findById(assetId)).thenReturn(Optional.of(existingAsset));
+        when(assetRepository.save(any(Asset.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        Asset updatedAsset = assetService.updateAsset(assetId, assetDetails);
+
+        // then
+        assertThat(updatedAsset.isLiquid()).isFalse();
+    }
+
+    @Test
     @DisplayName("모든 자산의 합계가 자산 이력에 정확히 기록되어야 한다")
     void refreshAllHistory_shouldCalculateTotalAmountCorrectly() {
         // given
