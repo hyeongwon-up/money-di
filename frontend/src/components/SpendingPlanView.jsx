@@ -94,6 +94,11 @@ const SpendingPlanView = () => {
         return 'bg-blue-50 text-blue-600';
     };
 
+    // 지출 통계 계산
+    const totalSpending = plans.reduce((sum, plan) => sum + Number(plan.amount), 0);
+    const paidSpending = plans.filter(p => p.paid).reduce((sum, plan) => sum + Number(plan.amount), 0);
+    const unpaidSpending = totalSpending - paidSpending;
+
     if (loading) {
         return <div className="text-center py-20 text-slate-400 font-bold animate-pulse">지출 계획을 불러오는 중...</div>;
     }
@@ -101,8 +106,26 @@ const SpendingPlanView = () => {
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-32">
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-8 rounded-3xl shadow-lg text-white">
-                <h2 className="text-2xl font-black mb-2 tracking-tight">지출 및 납부 계획</h2>
-                <p className="font-medium text-emerald-100 opacity-90">보험료, 적금 납부일 등 정기적이거나 예정된 지출을 관리하세요.</p>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <h2 className="text-2xl font-black mb-2 tracking-tight">지출 및 납부 계획</h2>
+                        <p className="font-medium text-emerald-100 opacity-90">보험료, 적금 납부일 등 정기적이거나 예정된 지출을 관리하세요.</p>
+                    </div>
+                    <div className="flex gap-4">
+                        <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                            <p className="text-[10px] font-black uppercase opacity-60 mb-1">총 지출 예정</p>
+                            <p className="text-xl font-black">₩ {totalSpending.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-emerald-300">
+                            <p className="text-[10px] font-black uppercase opacity-60 mb-1 text-white">납부 완료</p>
+                            <p className="text-xl font-black">₩ {paidSpending.toLocaleString()}</p>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-orange-300">
+                            <p className="text-[10px] font-black uppercase opacity-60 mb-1 text-white">미납부액</p>
+                            <p className="text-xl font-black">₩ {unpaidSpending.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
