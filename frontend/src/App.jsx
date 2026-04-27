@@ -6,6 +6,7 @@ import {
 import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, Trash2, Edit2, Info, Building2, LayoutGrid, Lock, Lightbulb, Calendar, DollarSign } from 'lucide-react';
 import ThoughtsView from './components/ThoughtsView';
 import SpendingPlanView from './components/SpendingPlanView';
+import PointsView from './components/PointsView';
 import { useAssets } from './hooks/useAssets';
 import { assetApi } from './api/assetApi';
 import { COLORS, INITIAL_CATEGORIES, APP_PASSWORD } from './constants/assetConstants';
@@ -22,7 +23,7 @@ const App = () => {
 
   const [form, setForm] = useState({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true });
   const [editingId, setEditingId] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'thoughts' | 'spending'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'thoughts' | 'spending' | 'points'
 
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -214,6 +215,12 @@ const App = () => {
               >
                 <Calendar className="w-4 h-4" /> 지출 계획
               </button>
+              <button
+                onClick={() => setActiveTab('points')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${activeTab === 'points' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                <Wallet className="w-4 h-4" /> 포인트 현황
+              </button>
             </div>
 
             {activeTab === 'dashboard' && (
@@ -239,6 +246,10 @@ const App = () => {
       ) : activeTab === 'spending' ? (
         <div className="pt-8 px-6">
           <SpendingPlanView />
+        </div>
+      ) : activeTab === 'points' ? (
+        <div className="pt-8 px-6">
+          <PointsView />
         </div>
       ) : (
         <main className="max-w-6xl mx-auto px-6 mt-8 space-y-8">
