@@ -1,3 +1,67 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body { @apply antialiased text-slate-800; font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+  button, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  button { touch-action: manipulation; }
+  button:disabled { @apply opacity-50 cursor-not-allowed; }
+  :focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+  input, select, textarea { min-width: 0; }
+  input:not([type=checkbox]), select, textarea { font-size: 16px; }
+  p, h4 { overflow-wrap: anywhere; }
+}
+@layer components {
+  .skip-link { @apply fixed -top-20 left-4 z-50 bg-blue-700 text-white p-3 rounded-lg focus:top-3; }
+  .app-nav { @apply sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur; }
+  .nav-inner { @apply max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-5 flex-wrap; }
+  .brand { @apply flex items-center gap-3 text-lg font-extrabold tracking-tight text-slate-900; }
+  .brand-icon { @apply bg-blue-600 text-white p-2.5 rounded-xl; }
+  .brand-caption { @apply block text-xs font-normal text-slate-500 tracking-normal mt-0.5; }
+  .nav-tabs { @apply flex items-center gap-1 bg-slate-100 p-1 rounded-xl; }
+  .nav-tabs button { @apply flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold text-slate-500 transition-colors; }
+  .nav-tabs button.active { @apply bg-white text-blue-700 shadow-sm; }
+  .nav-tabs button:hover { @apply text-blue-700; }
+  .connection-status { @apply flex items-center gap-2 text-xs text-slate-500; }
+  .status-dot { @apply w-2 h-2 rounded-full bg-amber-500; }
+  .status-dot.online { @apply bg-emerald-500; }
+  .dashboard-heading { @apply flex flex-wrap items-center justify-between gap-5 py-2; }
+  .dashboard-heading h2 { @apply text-2xl sm:text-3xl font-bold tracking-tight text-slate-900; }
+  .eyebrow { @apply text-xs font-semibold tracking-widest text-blue-600 mb-2; }
+  .primary-action { @apply inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl text-sm font-semibold transition-colors; }
+  .summary-grid { @apply grid grid-cols-1 md:grid-cols-3 gap-4; }
+  .summary-card { @apply bg-white border border-slate-200 rounded-2xl p-6 min-w-0; }
+  .summary-label { @apply flex items-center gap-2 text-sm font-medium text-slate-500; }
+  .summary-card strong { @apply block text-2xl xl:text-3xl font-bold tracking-tight mt-5 mb-3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .summary-card p { @apply text-xs text-slate-500 leading-relaxed; }
+  .summary-card.featured { @apply bg-slate-900 border-slate-900 text-white; }
+  .summary-card.featured .summary-label, .summary-card.featured p { @apply text-slate-300; }
+  .feedback { @apply flex flex-wrap items-center justify-between gap-3 rounded-xl p-4 text-sm border; }
+  .feedback p { @apply text-xs mt-1; }
+  .feedback.error { @apply bg-amber-50 text-amber-900 border-amber-200; }
+  .feedback.success { @apply bg-emerald-50 text-emerald-800 border-emerald-200; }
+  .feedback button { @apply inline-flex items-center gap-2 font-semibold rounded-lg px-3 py-2 bg-white/60; }
+  .empty-state { @apply h-full flex flex-col items-center justify-center gap-3 text-center text-slate-500 text-sm p-4; }
+  .empty-state svg { @apply text-slate-300; }
+  .empty-state p { @apply text-xs leading-relaxed; }
+  .asset-form { scroll-margin-top: 145px; }
+  .asset-search { @apply flex items-center gap-3 px-3 py-2 mb-6 bg-slate-50 rounded-xl border border-slate-200 text-slate-500; }
+  .asset-search input { @apply flex-1 w-full bg-transparent py-1.5 text-sm; }
+  .asset-search span { @apply text-xs whitespace-nowrap; }
+  .asset-row > div { min-width: 0; }
+  .asset-row button { min-width: 40px; min-height: 40px; }
+}
+@media (max-width: 767px) {
+  .nav-tabs { order: 3; width: 100%; }
+  .nav-tabs button { flex: 1; flex-direction: column; gap: 4px; padding: 10px 4px; white-space: nowrap; }
+  .asset-form { scroll-margin-top: 175px; }
+  .nav-inner { gap: 12px; }
+  .asset-row { align-items: flex-start; flex-direction: column; }
+  .asset-row > .text-right { width: 100%; border-top: 1px solid #f1f5f9; padding-top: 12px; }
+  .asset-row .w-12, .asset-row .w-14 { flex-shrink: 0; }
+  .thought-node .thought-children { padding-left: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
+}

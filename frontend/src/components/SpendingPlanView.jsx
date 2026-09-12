@@ -5,15 +5,20 @@ import { Calendar, PlusCircle, Trash2, Edit2, CheckCircle2, Clock } from 'lucide
 const SpendingPlanView = () => {
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ title: '', amount: '', dueDate: '', description: '', isPaid: false });
     const [editingId, setEditingId] = useState(null);
 
     const fetchPlans = async () => {
+        setError('');
         try {
             const res = await spendingApi.getPlans();
+            if (!Array.isArray(res.data)) throw new Error('Invalid response');
             setPlans(res.data);
         } catch (err) {
             console.error(err);
+            setError('지출 계획을 불러오지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요.');
         } finally {
             setLoading(false);
         }
@@ -25,8 +30,11 @@ const SpendingPlanView = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!form.title || !form.amount || !form.dueDate) return;
+        if (!form.title.trim() || form.amount === '' || !form.dueDate) return;
 
+        if (saving) return;
+        setSaving(true);
+        setError('');
         try {
             if (editingId) {
                 await spendingApi.updatePlan(editingId, form);
@@ -35,10 +43,12 @@ const SpendingPlanView = () => {
             }
             setForm({ title: '', amount: '', dueDate: '', description: '', isPaid: false });
             setEditingId(null);
-            fetchPlans();
+            await fetchPlans();
         } catch (err) {
             console.error(err);
-            alert('지출 계획 저장에 실패했습니다.');
+            setError('지출 계획 저장에 실패했습니다. 입력 내용은 유지됩니다.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -49,6 +59,7 @@ const SpendingPlanView = () => {
             fetchPlans();
         } catch (err) {
             console.error(err);
+            setError('변경하지 못했습니다. 연결을 확인하고 다시 시도해주세요.');
         }
     };
 
@@ -73,16 +84,17 @@ const SpendingPlanView = () => {
             fetchPlans();
         } catch (err) {
             console.error(err);
+            setError('변경하지 못했습니다. 연결을 확인하고 다시 시도해주세요.');
         }
     };
 
     const calculateDDay = (dueDate) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const due = new Date(dueDate);
+        const due = new Date(`${dueDate}T00:00:00`);
         due.setHours(0, 0, 0, 0);
         const diff = due - today;
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const days = Math.round(diff / (1000 * 60 * 60 * 24));
         return days;
     };
 
@@ -105,24 +117,25 @@ const SpendingPlanView = () => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-32">
+            {error && <div role="alert" className="feedback error"><span>{error}</span><button onClick={fetchPlans}>다시 불러오기</button></div>}
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-8 rounded-3xl shadow-lg text-white">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div>
                         <h2 className="text-2xl font-black mb-2 tracking-tight">지출 및 납부 계획</h2>
                         <p className="font-medium text-emerald-100 opacity-90">보험료, 적금 납부일 등 정기적이거나 예정된 지출을 관리하세요.</p>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
                         <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
                             <p className="text-[10px] font-black uppercase opacity-60 mb-1">총 지출 예정</p>
-                            <p className="text-xl font-black">₩ {totalSpending.toLocaleString()}</p>
+                            <p className="text-xl font-black">{error && !plans.length ? '확인 필요' : `₩ ${totalSpending.toLocaleString()}`}</p>
                         </div>
                         <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-emerald-300">
                             <p className="text-[10px] font-black uppercase opacity-60 mb-1 text-white">납부 완료</p>
-                            <p className="text-xl font-black">₩ {paidSpending.toLocaleString()}</p>
+                            <p className="text-xl font-black">{error && !plans.length ? '확인 필요' : `₩ ${paidSpending.toLocaleString()}`}</p>
                         </div>
                         <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-orange-300">
                             <p className="text-[10px] font-black uppercase opacity-60 mb-1 text-white">미납부액</p>
-                            <p className="text-xl font-black">₩ {unpaidSpending.toLocaleString()}</p>
+                            <p className="text-xl font-black">{error && !plans.length ? '확인 필요' : `₩ ${unpaidSpending.toLocaleString()}`}</p>
                         </div>
                     </div>
                 </div>
@@ -135,10 +148,11 @@ const SpendingPlanView = () => {
                             {editingId ? <Edit2 className="w-5 h-5 text-orange-500" /> : <PlusCircle className="w-5 h-5 text-emerald-600" />}
                             {editingId ? '지출 계획 수정' : '새 지출 계획 추가'}
                         </h3>
-                        <form onSubmit={handleSubmit} className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-4"><fieldset disabled={saving} className="space-y-4">
+                            {error && <p className="text-sm text-red-700">{error}</p>}
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">지출 항목 명</label>
-                                <input
+                                <label htmlFor="SpendingPlanView-field-1" className="block text-xs font-bold text-slate-500 mb-1">지출 항목 명</label>
+                                <input id="SpendingPlanView-field-1"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
                                     placeholder="예: 실비보험, 주택청약"
                                     value={form.title}
@@ -147,8 +161,8 @@ const SpendingPlanView = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">납부/지출 예정일</label>
-                                <input
+                                <label htmlFor="SpendingPlanView-field-2" className="block text-xs font-bold text-slate-500 mb-1">납부/지출 예정일</label>
+                                <input id="SpendingPlanView-field-2"
                                     type="date"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
                                     value={form.dueDate}
@@ -157,9 +171,9 @@ const SpendingPlanView = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label>
-                                <input
-                                    type="number"
+                                <label htmlFor="SpendingPlanView-field-3" className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label>
+                                <input id="SpendingPlanView-field-3"
+                                    type="number" min="0" step="1"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600"
                                     placeholder="0"
                                     value={form.amount}
@@ -168,8 +182,8 @@ const SpendingPlanView = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label>
-                                <textarea
+                                <label htmlFor="SpendingPlanView-field-4" className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label>
+                                <textarea id="SpendingPlanView-field-4"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm"
                                     value={form.description}
                                     onChange={e => setForm({ ...form, description: e.target.value })}
@@ -198,11 +212,11 @@ const SpendingPlanView = () => {
                                         취소
                                     </button>
                                 )}
-                                <button className={`flex-[2] p-4 rounded-xl font-bold text-white shadow-lg ${editingId ? 'bg-orange-500' : 'bg-emerald-600'}`}>
-                                    {editingId ? '수정 완료' : '등록하기'}
+                                <button type="submit" disabled={saving} className={`flex-[2] p-4 rounded-xl font-bold text-white shadow-lg ${editingId ? 'bg-orange-500' : 'bg-emerald-600'}`}>
+                                    {saving ? '저장 중…' : editingId ? '수정 완료' : '등록하기'}
                                 </button>
                             </div>
-                        </form>
+                        </fieldset></form>
                     </div>
                 </div>
 
@@ -218,7 +232,7 @@ const SpendingPlanView = () => {
                                     const dDay = calculateDDay(plan.dueDate);
                                     return (
                                         <div key={plan.id} className={`group p-5 border rounded-2xl transition-all ${plan.paid ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md'}`}>
-                                            <div className="flex justify-between items-center">
+                                            <div className="asset-row flex justify-between items-center gap-4">
                                                 <div className="flex gap-4">
                                                     <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black ${getDDayColor(dDay)}`}>
                                                         <span className="text-[10px] uppercase">D-Day</span>
@@ -247,20 +261,20 @@ const SpendingPlanView = () => {
                                                         >
                                                             <CheckCircle2 className="w-5 h-5" />
                                                         </button>
-                                                        <button onClick={() => handleEdit(plan)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                                        <button onClick={() => handleDelete(plan.id)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                        <button aria-label={`${plan.title} 수정`} onClick={() => handleEdit(plan)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                                        <button aria-label={`${plan.title} 삭제`} onClick={() => handleDelete(plan.id)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     );
                                 })
-                            ) : (
+                            ) : !error ? (
                                 <div className="h-64 flex flex-col items-center justify-center text-slate-400 italic">
                                     <Calendar className="w-12 h-12 mb-3 opacity-20" />
                                     등록된 지출 계획이 없습니다.
                                 </div>
-                            )}
+                            ) : null}
                         </div>
                     </div>
                 </div>

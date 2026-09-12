@@ -19,13 +19,14 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
     };
 
     return (
-        <div className="relative group">
+        <div className="thought-node relative group">
             {/* 꼬리 연결선 (자식이 있을 경우 들여쓰기 선) */}
             <div className="absolute left-[19px] top-10 bottom-0 w-[2px] bg-slate-100 group-hover:bg-slate-200 transition-colors z-0" />
 
             <div className="flex gap-3 relative z-10 pt-4">
                 {/* 아바타/아이콘 영역 */}
-                <div
+                <button
+                    aria-label="하위 생각 펼치기 또는 접기" aria-expanded={isExpanded}
                     className="w-10 h-10 shrink-0 bg-white border-2 border-slate-200 rounded-full flex items-center justify-center cursor-pointer shadow-sm hover:border-blue-400 hover:text-blue-600 transition-colors"
                     onClick={() => setIsExpanded(!isExpanded)}
                 >
@@ -34,10 +35,10 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
                     ) : (
                         <MessageSquare className="w-4 h-4 text-slate-300" />
                     )}
-                </div>
+                </button>
 
                 {/* 생각 내용 영역 */}
-                <div className="flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="min-w-0 flex-1 bg-white border border-slate-100 p-4 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     {isEditing ? (
                         <div className="space-y-2">
                             <textarea
@@ -72,7 +73,7 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
                     )}
 
                     {!isEditing && (
-                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-50">
+                        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-50">
                             <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
                                 {new Date(thought.createdAt).toLocaleString()}
                             </span>
@@ -81,17 +82,17 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
                                 className="text-xs font-bold text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"
                             >
                                 <CornerDownRight className="w-3 h-3" />
-                                꼬리 무기 (답글)
+                                답글 달기
                             </button>
                             <button
                                 onClick={() => setIsEditing(true)}
-                                className="text-xs font-bold text-slate-400 hover:text-amber-500 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100 ml-auto"
+                                className="text-xs font-bold text-slate-400 hover:text-amber-500 flex items-center gap-1 transition-colors  ml-auto"
                             >
                                 수정
                             </button>
                             <button
-                                onClick={() => onDelete(thought.id)}
-                                className="text-xs font-bold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors opacity-0 group-hover:opacity-100"
+                                aria-label="생각 삭제" onClick={() => onDelete(thought.id)}
+                                className="text-xs font-bold text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors "
                             >
                                 <Trash2 className="w-3 h-3" />
                             </button>
@@ -102,7 +103,7 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
 
             {/* 자식 노드들 렌더링 (재귀) */}
             {isExpanded && thought.subThoughts && thought.subThoughts.length > 0 && (
-                <div className="pl-12">
+                <div className="thought-children pl-12">
                     {thought.subThoughts.map(child => (
                         <ThoughtNode
                             key={child.id}
@@ -121,15 +122,20 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
 const ThoughtsView = () => {
     const [thoughts, setThoughts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [saving, setSaving] = useState(false);
     const [replyingTo, setReplyingTo] = useState(null); // parent thought ID
     const [newContent, setNewContent] = useState('');
 
     const fetchThoughts = async () => {
+        setError('');
         try {
             const res = await thoughtApi.getThoughts();
+            if (!Array.isArray(res.data)) throw new Error('Invalid response');
             setThoughts(res.data);
         } catch (err) {
             console.error(err);
+            setError('생각을 불러오지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요.');
         } finally {
             setLoading(false);
         }
@@ -143,6 +149,9 @@ const ThoughtsView = () => {
         e.preventDefault();
         if (!newContent.trim()) return;
 
+        if (saving) return;
+        setSaving(true);
+        setError('');
         try {
             await thoughtApi.createThought({
                 content: newContent,
@@ -153,7 +162,9 @@ const ThoughtsView = () => {
             await fetchThoughts();
         } catch (err) {
             console.error(err);
-            alert('생각 저장에 실패했습니다.');
+            setError('생각 저장에 실패했습니다. 입력 내용은 유지됩니다.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -184,7 +195,8 @@ const ThoughtsView = () => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-32">
+        <div className="max-w-4xl mx-auto space-y-8 pb-48">
+            {error && <div role="alert" className="feedback error"><span>{error}</span><button onClick={fetchThoughts}>다시 불러오기</button></div>}
             <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 rounded-3xl shadow-lg text-white">
                 <h2 className="text-2xl font-black mb-2 tracking-tight">생각 정리 공간</h2>
                 <p className="font-medium text-blue-100 opacity-90">자산이나 투자 아이디어를 꼬리에 꼬리를 무는 형태로 정리해보세요.</p>
@@ -201,7 +213,7 @@ const ThoughtsView = () => {
                     />
                 ))}
 
-                {thoughts.length === 0 && (
+                {!error && thoughts.length === 0 && (
                     <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-3xl">
                         <MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-3" />
                         <p className="text-slate-400 font-bold">아직 작성된 생각이 없습니다.<br />첫 번째 아이디어를 기록해보세요!</p>
@@ -211,6 +223,7 @@ const ThoughtsView = () => {
 
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-slate-200 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-40">
                 <div className="max-w-4xl mx-auto">
+                    {error && <p className="text-sm text-red-700 mb-2">{error}</p>}
                     {replyingTo && (
                         <div className="flex items-center justify-between bg-blue-50 text-blue-700 px-4 py-2 rounded-t-xl text-xs font-bold border-b border-blue-100">
                             <span className="flex items-center gap-1">
@@ -221,19 +234,19 @@ const ThoughtsView = () => {
                     )}
                     <form onSubmit={handleSubmit} className="flex gap-2 p-2 bg-white rounded-xl shadow-sm border border-slate-200">
                         <textarea
-                            value={newContent}
+                            disabled={saving} value={newContent}
                             onChange={(e) => setNewContent(e.target.value)}
                             placeholder={replyingTo ? "이 생각에 이어질 내용은..." : "새로운 주제의 생각 쓰기..."}
-                            className="flex-1 p-3 bg-transparent border-none resize-none focus:outline-none focus:ring-0 max-h-32 text-sm"
+                            aria-label="새 생각 또는 답글 내용" className="min-w-0 flex-1 p-3 bg-transparent border-none resize-none focus:outline-none focus:ring-0 max-h-32 text-sm"
                             rows={2}
                             autoFocus={!!replyingTo}
                         />
                         <button
                             type="submit"
-                            disabled={!newContent.trim()}
-                            className="bg-blue-600 text-white p-4 rounded-xl font-bold shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center min-w-[100px]"
+                            disabled={saving || !newContent.trim()}
+                            className="bg-blue-600 text-white p-4 rounded-xl font-bold shadow-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center min-w-[80px]"
                         >
-                            기록하기
+                            {saving ? '저장 중…' : '기록하기'}
                         </button>
                     </form>
                 </div>

@@ -5,18 +5,28 @@ export const useAssets = () => {
   const [assets, setAssets] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isServerOnline, setIsServerOnline] = useState(true);
+  const [isServerOnline, setIsServerOnline] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   const fetchData = useCallback(async () => {
+    setFetching(true);
+    setFetchError(false);
     try {
       const [assetRes, historyRes] = await Promise.all([
         assetApi.getAssets(),
         assetApi.getHistory()
       ]);
-      setAssets(assetRes.data);
+      if (!Array.isArray(assetRes.data) || !Array.isArray(historyRes.data)) throw new Error('Invalid asset response');
+      setAssets(assetRes.data.map(asset => ({ ...asset, category: asset.category === 'LOAN' ? 'DEBT' : asset.category })));
+      setIsServerOnline(true);
       setHistory(historyRes.data.sort((a, b) => new Date(a.recordedDate) - new Date(b.recordedDate)));
     } catch (error) {
       console.error('Failed to fetch data', error);
+      setFetchError(true);
+      setIsServerOnline(false);
+    } finally {
+      setFetching(false);
     }
   }, []);
 
@@ -37,6 +47,8 @@ export const useAssets = () => {
   }, [fetchData, checkHealth]);
 
   return {
+    fetching,
+    fetchError,
     assets,
     setAssets,
     history,
