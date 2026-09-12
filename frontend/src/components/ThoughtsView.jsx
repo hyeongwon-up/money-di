@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { getErrorMessage } from '../api/errorMessage';
 import { thoughtApi } from '../api/thoughtApi';
 import { PlusCircle, Trash2, CornerDownRight, MessageSquare, ChevronRight, ChevronDown } from 'lucide-react';
 
@@ -42,7 +43,7 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
                     {isEditing ? (
                         <div className="space-y-2">
                             <textarea
-                                value={editContent}
+                                aria-label="생각 내용 수정" maxLength={2000} value={editContent}
                                 onChange={(e) => setEditContent(e.target.value)}
                                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                 rows={3}
@@ -120,6 +121,15 @@ const ThoughtNode = ({ thought, onReply, onDelete, onUpdate }) => {
 };
 
 const ThoughtsView = () => {
+    const composerRef = useRef(null);
+    const findThought = (items, id) => {
+        for (const item of items) {
+            if (item.id === id) return item;
+            const child = findThought(item.subThoughts || [], id);
+            if (child) return child;
+        }
+        return null;
+    };
     const [thoughts, setThoughts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -162,7 +172,7 @@ const ThoughtsView = () => {
             await fetchThoughts();
         } catch (err) {
             console.error(err);
-            setError('생각 저장에 실패했습니다. 입력 내용은 유지됩니다.');
+            setError(getErrorMessage(err));
         } finally {
             setSaving(false);
         }
@@ -174,7 +184,7 @@ const ThoughtsView = () => {
             await fetchThoughts();
         } catch (err) {
             console.error(err);
-            alert('수정에 실패했습니다.');
+            setError(getErrorMessage(err));
             throw err;
         }
     };
@@ -186,7 +196,7 @@ const ThoughtsView = () => {
             await fetchThoughts();
         } catch (err) {
             console.error(err);
-            alert('삭제에 실패했습니다.');
+            setError(getErrorMessage(err));
         }
     };
 
@@ -207,7 +217,7 @@ const ThoughtsView = () => {
                     <ThoughtNode
                         key={thought.id}
                         thought={thought}
-                        onReply={setReplyingTo}
+                        onReply={id => { setReplyingTo(id); composerRef.current?.focus(); }}
                         onDelete={handleDelete}
                         onUpdate={handleUpdate}
                     />
@@ -227,14 +237,14 @@ const ThoughtsView = () => {
                     {replyingTo && (
                         <div className="flex items-center justify-between bg-blue-50 text-blue-700 px-4 py-2 rounded-t-xl text-xs font-bold border-b border-blue-100">
                             <span className="flex items-center gap-1">
-                                <CornerDownRight className="w-3 h-3" /> 특정 생각에 꼬리를 무는 중...
+                                <CornerDownRight className="w-3 h-3" /> 답글 대상: {findThought(thoughts, replyingTo)?.content.slice(0, 70) || '선택한 생각'}
                             </span>
                             <button onClick={() => setReplyingTo(null)} className="hover:text-red-500">취소 (새로운 메인 생각 쓰기)</button>
                         </div>
                     )}
                     <form onSubmit={handleSubmit} className="flex gap-2 p-2 bg-white rounded-xl shadow-sm border border-slate-200">
                         <textarea
-                            disabled={saving} value={newContent}
+                            ref={composerRef} maxLength={2000} disabled={saving} value={newContent}
                             onChange={(e) => setNewContent(e.target.value)}
                             placeholder={replyingTo ? "이 생각에 이어질 내용은..." : "새로운 주제의 생각 쓰기..."}
                             aria-label="새 생각 또는 답글 내용" className="min-w-0 flex-1 p-3 bg-transparent border-none resize-none focus:outline-none focus:ring-0 max-h-32 text-sm"

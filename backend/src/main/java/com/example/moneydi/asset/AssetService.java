@@ -1,6 +1,9 @@
 package com.example.moneydi.asset;
 
 import lombok.RequiredArgsConstructor;
+import com.example.moneydi.common.InputChecks;
+import com.example.moneydi.common.ResourceNotFoundException;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,7 +18,7 @@ public class AssetService {
     private final AssetItemHistoryRepository assetItemHistoryRepository;
 
     public Asset saveAsset(Asset asset) {
-        if (asset.getAmount() == null) asset.setAmount(0L);
+        validateAsset(asset);
         normalizeAmount(asset);
         Asset saved = assetRepository.save(asset);
         refreshAllHistory(); // 전체 이력 재계산으로 정확도 보장
@@ -56,8 +59,9 @@ public class AssetService {
     }
 
     public AssetHistory updateAssetHistory(Long id, AssetHistory history) {
+        InputChecks.amount(history.getTotalAmount(), -InputChecks.MAX_AMOUNT);
         AssetHistory existing = assetHistoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("History not found with id " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("자산 이력을 찾을 수 없습니다."));
         existing.setTotalAmount(history.getTotalAmount());
         if (history.getRecordedDate() != null) {
             existing.setRecordedDate(history.getRecordedDate());
@@ -66,12 +70,15 @@ public class AssetService {
     }
 
     public void deleteAssetHistory(Long id) {
+        if (!assetHistoryRepository.existsById(id)) throw new ResourceNotFoundException("자산 이력을 찾을 수 없습니다.");
         assetHistoryRepository.deleteById(id);
     }
 
     public Asset updateAsset(Long id, Asset assetDetails) {
+        validateAsset(assetDetails);
+        normalizeAmount(assetDetails);
         Asset asset = assetRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Asset not found with id " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("자산을 찾을 수 없습니다. 목록을 새로고침해주세요."));
         
         // 금액이 변경된 경우 이전 금액으로 백업 (변동률 계산용)
         if (asset.getAmount() != null && !asset.getAmount().equals(assetDetails.getAmount())) {
@@ -93,6 +100,16 @@ public class AssetService {
         return updated;
     }
 
+    private void validateAsset(Asset asset) {
+        asset.setName(InputChecks.requiredText(asset.getName(), "자산명", 100));
+        InputChecks.amount(asset.getAmount(), -InputChecks.MAX_AMOUNT);
+        if (asset.getCategory() == null || !Set.of("SAVINGS", "INSTALLMENT", "STOCK", "CRYPTO", "REAL_ESTATE", "DEBT", "LOAN", "OTHER").contains(asset.getCategory())) {
+            throw new IllegalArgumentException("올바른 자산 카테고리를 선택해주세요.");
+        }
+        asset.setPlatform(InputChecks.optionalText(asset.getPlatform(), "플랫폼", 255));
+        asset.setDescription(InputChecks.optionalText(asset.getDescription(), "메모", 255));
+    }
+
     private void normalizeAmount(Asset asset) {
         if (asset.getAmount() == null) return;
         String cat = asset.getCategory();
@@ -104,6 +121,7 @@ public class AssetService {
     }
 
     public void deleteAsset(Long id) {
+        if (!assetRepository.existsById(id)) throw new ResourceNotFoundException("자산을 찾을 수 없습니다.");
         assetRepository.deleteById(id);
         refreshAllHistory();
     }

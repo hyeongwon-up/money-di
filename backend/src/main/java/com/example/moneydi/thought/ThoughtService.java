@@ -1,6 +1,8 @@
 package com.example.moneydi.thought;
 
 import lombok.RequiredArgsConstructor;
+import com.example.moneydi.common.InputChecks;
+import com.example.moneydi.common.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,11 +25,11 @@ public class ThoughtService {
 
     public ThoughtResponseDto createThought(ThoughtRequestDto request) {
         Thought thought = new Thought();
-        thought.setContent(request.getContent());
+        thought.setContent(InputChecks.requiredText(request.getContent(), "생각 내용", 2000));
 
         if (request.getParentId() != null) {
             Thought parent = thoughtRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new IllegalArgumentException("Parent thought not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("답글을 달 생각이 삭제되었습니다. 목록을 새로고침해주세요."));
             parent.addSubThought(thought);
         }
 
@@ -37,15 +39,15 @@ public class ThoughtService {
 
     public ThoughtResponseDto updateThought(Long id, ThoughtRequestDto request) {
         Thought thought = thoughtRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Thought not found"));
-        thought.setContent(request.getContent());
+                .orElseThrow(() -> new ResourceNotFoundException("생각을 찾을 수 없습니다. 목록을 새로고침해주세요."));
+        thought.setContent(InputChecks.requiredText(request.getContent(), "생각 내용", 2000));
         Thought updatedThought = thoughtRepository.save(thought);
         return ThoughtResponseDto.fromEntity(updatedThought);
     }
 
     public void deleteThought(Long id) {
         if (!thoughtRepository.existsById(id)) {
-            throw new IllegalArgumentException("Thought not found");
+            throw new ResourceNotFoundException("생각을 찾을 수 없습니다. 목록을 새로고침해주세요.");
         }
         thoughtRepository.deleteById(id);
     }

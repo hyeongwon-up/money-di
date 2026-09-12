@@ -36,11 +36,7 @@ public class ThoughtController {
     // 생각 삭제 (하위 생각까지 모두 삭제됨 - CascadeType.ALL)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteThought(@PathVariable Long id) {
-        try {
-            thoughtService.deleteThought(id);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+        thoughtService.deleteThought(id);
+        return ResponseEntity.noContent().build();
     }
 }

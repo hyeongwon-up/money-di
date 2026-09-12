@@ -8,6 +8,7 @@ import ThoughtsView from './components/ThoughtsView';
 import SpendingPlanView from './components/SpendingPlanView';
 import PointsView from './components/PointsView';
 import { useAssets } from './hooks/useAssets';
+import { getErrorMessage } from './api/errorMessage';
 import { assetApi } from './api/assetApi';
 import { COLORS, INITIAL_CATEGORIES, APP_PASSWORD } from './constants/assetConstants';
 
@@ -43,12 +44,17 @@ const App = () => {
 
   // 이력 수정 핸들러
   const handleHistoryUpdate = async (historyItem) => {
+    historyItem = history.find(item => item.id === historyItem.id) || historyItem;
     const newAmount = prompt(
       `${historyItem.recordedDate}의 순 자산 금액을 수정하시겠습니까?\n(현재: ₩${historyItem.totalAmount.toLocaleString()})`, 
       historyItem.totalAmount
     );
     
-    if (newAmount === null || newAmount === "" || isNaN(newAmount)) return;
+    if (newAmount === null) return;
+    if (!newAmount.trim() || !Number.isSafeInteger(Number(newAmount))) {
+      setNotice({ error: true, text: '원 단위의 올바른 정수 금액을 입력해주세요.' });
+      return;
+    }
 
     try {
       setLoading(true);
@@ -57,10 +63,10 @@ const App = () => {
         totalAmount: parseInt(newAmount, 10)
       });
       await refreshAssets();
-      alert('성공적으로 수정되었습니다.');
+      setNotice({ text: '자산 이력을 수정했습니다.' });
     } catch (error) {
       console.error('Failed to update history', error);
-      alert('이력 수정에 실패했습니다.');
+      setNotice({ error: true, text: getErrorMessage(error) });
     } finally {
       setLoading(false);
     }
@@ -103,7 +109,7 @@ const App = () => {
       setEditingId(null);
       setNotice({ text: editingId ? '자산 정보를 수정했습니다.' : '새 자산을 등록했습니다.' });
       await refreshAssets();
-    } catch (error) { setNotice({ error: true, text: '저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요. 입력 내용은 유지됩니다.' }); }
+    } catch (error) { setNotice({ error: true, text: getErrorMessage(error) }); }
     finally { setLoading(false); }
   };
 
@@ -114,7 +120,7 @@ const App = () => {
       await assetApi.deleteAsset(id);
       setNotice({ text: '자산을 삭제했습니다.' });
       await refreshAssets();
-    } catch (error) { setNotice({ error: true, text: '삭제하지 못했습니다. 다시 시도해주세요.' }); }
+    } catch (error) { setNotice({ error: true, text: getErrorMessage(error) }); }
     finally { setLoading(false); }
   };
 
@@ -363,11 +369,11 @@ const App = () => {
                   {notice && <p className={`text-sm ${notice.error ? 'text-red-700' : 'text-emerald-700'}`}>{notice.text}</p>}
                   <div className="grid grid-cols-2 gap-4">
                     <div><label htmlFor="asset-field-1" className="block text-xs font-bold text-slate-500 mb-1">카테고리</label><select id="asset-field-1" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{Object.entries(INITIAL_CATEGORIES).map(([key, { label, emoji }]) => <option key={key} value={key}>{emoji} {label}</option>)}</select></div>
-                    <div><label htmlFor="asset-field-2" className="block text-xs font-bold text-slate-500 mb-1">플랫폼/금융사</label><input id="asset-field-2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="예: 국민은행, 미래에셋" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })} /></div>
+                    <div><label htmlFor="asset-field-2" className="block text-xs font-bold text-slate-500 mb-1">플랫폼/금융사</label><input maxLength={255} id="asset-field-2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="예: 국민은행, 미래에셋" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })} /></div>
                   </div>
                   <div><label htmlFor="asset-field-3" className="block text-xs font-bold text-slate-500 mb-1">자산 명</label><input id="asset-field-3" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" name="assetName" required maxLength={100} placeholder="예: 적금, 삼성전자" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
                   <div><label htmlFor="asset-field-4" className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label><input id="asset-field-4" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-600" required step="1" type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
-                  <p className="text-xs text-slate-500">금액은 원 단위로 입력해주세요. 대출·부채는 자동으로 차감됩니다.</p><div><label htmlFor="asset-field-5" className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label><textarea id="asset-field-5" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
+                  <p className="text-xs text-slate-500">금액은 원 단위로 입력해주세요. 대출·부채는 자동으로 차감됩니다.</p><div><label htmlFor="asset-field-5" className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label><textarea maxLength={255} id="asset-field-5" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
                   <div className="flex items-center gap-2 pt-2 px-1">
                     <input
                       id="isLiquid"

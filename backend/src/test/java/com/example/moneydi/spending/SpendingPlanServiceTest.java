@@ -57,6 +57,7 @@ class SpendingPlanServiceTest {
         SpendingPlanRequestDto request = new SpendingPlanRequestDto();
         request.setTitle("수정된 제목");
         request.setAmount(50000L);
+        request.setDueDate(LocalDate.now());
 
         when(spendingPlanRepository.findById(planId)).thenReturn(Optional.of(existingPlan));
         when(spendingPlanRepository.save(any(SpendingPlan.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -67,5 +68,24 @@ class SpendingPlanServiceTest {
         // then
         assertThat(updatedPlan.getTitle()).isEqualTo("수정된 제목");
         assertThat(updatedPlan.getAmount()).isEqualTo(50000L);
+    }
+
+    @Test
+    void rejectsNegativeAmountBeforeSaving() {
+        SpendingPlanRequestDto request = new SpendingPlanRequestDto();
+        request.setTitle("지출");
+        request.setAmount(-100L);
+        request.setDueDate(LocalDate.now());
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> spendingPlanService.createPlan(request));
+        verifyNoInteractions(spendingPlanRepository);
+    }
+
+    @Test
+    void rejectsMissingDueDateBeforeSaving() {
+        SpendingPlanRequestDto request = new SpendingPlanRequestDto();
+        request.setTitle("지출");
+        request.setAmount(100L);
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> spendingPlanService.createPlan(request));
+        verifyNoInteractions(spendingPlanRepository);
     }
 }

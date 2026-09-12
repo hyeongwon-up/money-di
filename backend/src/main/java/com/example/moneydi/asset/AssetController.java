@@ -13,8 +13,8 @@ public class AssetController {
     private final AssetService assetService;
 
     @PostMapping
-    public Asset register(@RequestBody Asset asset) {
-        return assetService.saveAsset(asset);
+    public Asset register(@RequestBody AssetRequestDto asset) {
+        return assetService.saveAsset(asset.toAsset());
     }
 
     @GetMapping
@@ -38,8 +38,8 @@ public class AssetController {
     }
 
     @PutMapping("/{id}")
-    public Asset update(@PathVariable Long id, @RequestBody Asset asset) {
-        return assetService.updateAsset(id, asset);
+    public Asset update(@PathVariable Long id, @RequestBody AssetRequestDto asset) {
+        return assetService.updateAsset(id, asset.toAsset());
     }
 
     @DeleteMapping("/{id}")

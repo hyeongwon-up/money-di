@@ -144,4 +144,28 @@ class AssetServiceTest {
         verify(assetHistoryRepository).save(captor.capture());
         assertThat(captor.getValue().getTotalAmount()).isEqualTo(700L);
     }
+
+    @Test
+    void editingDebtWithPositiveInputMustNotResetPreviousAmount() {
+        Asset existing = new Asset();
+        existing.setAmount(-1000L);
+        existing.setPreviousAmount(-800L);
+        Asset details = new Asset();
+        details.setName("대출");
+        details.setCategory("DEBT");
+        details.setAmount(1000L);
+        when(assetRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(assetRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(assetService.updateAsset(1L, details).getPreviousAmount()).isEqualTo(-800L);
+    }
+
+    @Test
+    void invalidAssetCannotWriteData() {
+        Asset asset = new Asset();
+        asset.setName(" ");
+        asset.setAmount(100L);
+        asset.setCategory("SAVINGS");
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> assetService.saveAsset(asset));
+        verifyNoInteractions(assetRepository, assetHistoryRepository, assetItemHistoryRepository);
+    }
 }

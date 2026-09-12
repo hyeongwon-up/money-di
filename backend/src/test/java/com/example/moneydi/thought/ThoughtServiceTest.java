@@ -69,4 +69,14 @@ class ThoughtServiceTest {
         // then
         assertThat(response.getContent()).isEqualTo("수정된 내용");
     }
+
+    @Test
+    void rejectsBlankAndOversizedThoughtsBeforeSaving() {
+        ThoughtRequestDto request = new ThoughtRequestDto();
+        request.setContent("  ");
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> thoughtService.createThought(request));
+        request.setContent("a".repeat(2001));
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> thoughtService.createThought(request));
+        verifyNoInteractions(thoughtRepository);
+    }
 }

@@ -31,11 +31,7 @@ public class SpendingPlanController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        try {
-            spendingPlanService.deletePlan(id);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+        spendingPlanService.deletePlan(id);
+        return ResponseEntity.noContent().build();
     }
 }

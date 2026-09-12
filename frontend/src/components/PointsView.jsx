@@ -1,185 +1,113 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { pointApi } from '../api/pointApi';
-import { Wallet, PlusCircle, MinusCircle, History, User, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { getErrorMessage } from '../api/errorMessage';
+import { Wallet, History, ArrowUpRight, ArrowDownRight, RefreshCw } from 'lucide-react';
+
+const OWNERS = ['남편네', '여편네'];
+const MAX_AMOUNT = Number.MAX_SAFE_INTEGER;
 
 const PointsView = () => {
     const [points, setPoints] = useState([]);
     const [history, setHistory] = useState({ '남편네': [], '여편네': [] });
     const [loading, setLoading] = useState(true);
-    const [activeOwner, setActiveOwner] = useState('남편네');
+    const [fetchError, setFetchError] = useState('');
+    const [notice, setNotice] = useState(null);
+    const [saving, setSaving] = useState(false);
+    const pending = useRef(false);
+    const [activeOwner, setActiveOwner] = useState(OWNERS[0]);
+    const [action, setAction] = useState('add');
     const [form, setForm] = useState({ amount: '', description: '' });
+    const balance = points.find(point => point.owner === activeOwner)?.balance ?? 0;
+    const amount = Number(form.amount);
+    const validAmount = Number.isSafeInteger(amount) && amount > 0;
+    const projectedBalance = action === 'add' ? balance + amount : balance - amount;
+    const insufficient = validAmount && action === 'use' && amount > balance;
+    const exceedsLimit = validAmount && action === 'add' && amount > MAX_AMOUNT - balance;
 
     const fetchData = async () => {
+        setLoading(true);
         try {
-            const [pointsRes, husbandHistory, wifeHistory] = await Promise.all([
-                pointApi.getAllPoints(),
-                pointApi.getHistory('남편네'),
-                pointApi.getHistory('여편네')
+            const [balances, ...histories] = await Promise.all([
+                pointApi.getAllPoints(), ...OWNERS.map(owner => pointApi.getHistory(owner))
             ]);
-            setPoints(pointsRes.data);
-            setHistory({
-                '남편네': husbandHistory.data,
-                '여편네': wifeHistory.data
-            });
-        } catch (err) {
-            console.error(err);
-        } finally {
-            setLoading(false);
-        }
+            if (![balances, ...histories].every(response => Array.isArray(response.data))) throw new Error('Invalid response');
+            setPoints(balances.data);
+            setHistory(Object.fromEntries(OWNERS.map((owner, index) => [owner, histories[index].data])));
+            setFetchError('');
+        } catch (error) {
+            setFetchError('포인트 정보를 불러오지 못했습니다. 연결을 확인하고 다시 불러와주세요.');
+        } finally { setLoading(false); }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    useEffect(() => { fetchData(); }, []);
 
-    const handleAction = async (type) => {
-        if (!form.amount || !form.description) {
-            alert('금액과 내용을 입력해주세요.');
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        if (pending.current || loading || fetchError) return;
+        if (!validAmount || !form.description.trim() || insufficient || exceedsLimit) {
+            setNotice({ error: true, text: insufficient ? '사용할 포인트가 잔액보다 많습니다.' : '금액과 사유를 확인해주세요.' });
             return;
         }
-
+        pending.current = true;
+        setSaving(true);
+        setNotice(null);
         try {
-            if (type === 'add') {
-                await pointApi.addPoints(activeOwner, { amount: Number(form.amount), description: form.description });
-            } else {
-                await pointApi.usePoints(activeOwner, { amount: Number(form.amount), description: form.description });
-            }
+            const payload = { amount, description: form.description.trim() };
+            const response = await (action === 'add' ? pointApi.addPoints(activeOwner, payload) : pointApi.usePoints(activeOwner, payload));
+            setPoints(previous => [...previous.filter(point => point.owner !== activeOwner), response.data]);
             setForm({ amount: '', description: '' });
-            fetchData();
-        } catch (err) {
-            alert(err.response?.data?.message || '처리에 실패했습니다.');
-        }
+            setNotice({ text: `${activeOwner} 포인트 ${amount.toLocaleString()} P를 ${action === 'add' ? '적립' : '사용'}했습니다.` });
+            await fetchData();
+        } catch (error) {
+            setNotice({ error: true, text: getErrorMessage(error) });
+            if (!error.response || error.response.status === 409) {
+                setFetchError('처리 결과를 확인하려면 최신 잔액과 내역을 다시 불러와주세요.');
+            }
+        } finally { pending.current = false; setSaving(false); }
     };
-
-    const getOwnerPoint = (owner) => {
-        return points.find(p => p.owner === owner)?.balance || 0;
-    };
-
-    if (loading) {
-        return <div className="text-center py-20 text-slate-400 font-bold animate-pulse">포인트 정보를 불러오는 중...</div>;
-    }
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 pb-32">
-            {/* Header / Summary */}
-            <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-3xl shadow-lg text-white">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div>
-                        <h2 className="text-2xl font-black mb-2 tracking-tight">포인트 현황</h2>
-                        <p className="font-medium text-indigo-100 opacity-90">부부의 포인트를 효율적으로 관리하세요.</p>
-                    </div>
-                    <div className="flex gap-6">
-                        <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 min-w-[160px]">
-                            <p className="text-[10px] font-black uppercase opacity-60 mb-1">남편네 포인트</p>
-                            <p className="text-2xl font-black">P {getOwnerPoint('남편네').toLocaleString()}</p>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/10 min-w-[160px]">
-                            <p className="text-[10px] font-black uppercase opacity-60 mb-1">여편네 포인트</p>
-                            <p className="text-2xl font-black">P {getOwnerPoint('여편네').toLocaleString()}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Left Side: Forms */}
-                <div className="lg:col-span-4 space-y-6">
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                            <Wallet className="w-5 h-5 text-indigo-600" /> 포인트 관리
-                        </h3>
-                        
-                        <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-                            <button 
-                                onClick={() => setActiveOwner('남편네')}
-                                className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${activeOwner === '남편네' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-                            >
-                                남편네
-                            </button>
-                            <button 
-                                onClick={() => setActiveOwner('여편네')}
-                                className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${activeOwner === '여편네' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-                            >
-                                여편네
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">금액 (P)</label>
-                                <input
-                                    type="number"
-                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-indigo-600"
-                                    placeholder="0"
-                                    value={form.amount}
-                                    onChange={e => setForm({ ...form, amount: e.target.value })}
-                                />
+        <div className="max-w-6xl mx-auto space-y-6 pb-12">
+            <header className="dashboard-heading"><div><p className="eyebrow">OUR POINTS</p><h2>포인트 현황</h2><p className="text-sm text-slate-500 mt-2">누구의 포인트인지 선택하고 적립과 사용을 기록하세요.</p></div>
+                <button className="flex items-center gap-2 rounded-xl bg-white border p-3 text-sm" disabled={loading || saving} onClick={fetchData}><RefreshCw size={16} />{loading ? '불러오는 중…' : '새로고침'}</button>
+            </header>
+            {fetchError && <div role="alert" className="feedback error">{fetchError}</div>}
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-4" aria-label="소유자별 포인트 잔액" aria-busy={loading}>
+                {OWNERS.map(owner => <button key={owner} disabled={saving} aria-pressed={activeOwner === owner} onClick={() => { setActiveOwner(owner); setNotice(null); }} className={`text-left summary-card ${activeOwner === owner ? 'featured' : ''}`}>
+                    <span className="summary-label"><Wallet size={18} />{owner} 포인트</span>
+                    <strong>{loading ? '불러오는 중…' : fetchError ? '확인 필요' : `${(points.find(point => point.owner === owner)?.balance ?? 0).toLocaleString()} P`}</strong>
+                    <p>{activeOwner === owner ? '현재 선택됨' : '선택하여 관리하기'}</p>
+                </button>)}
+            </section>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <section className="lg:col-span-4 bg-white p-6 rounded-2xl border border-slate-200 self-start">
+                    <h3 className="text-lg font-bold mb-5">{activeOwner} 포인트 기록</h3>
+                    {notice && <div role={notice.error ? 'alert' : 'status'} className={`feedback mb-4 ${notice.error ? 'error' : 'success'}`}>{notice.text}</div>}
+                    <form onSubmit={handleSubmit}>
+                        <fieldset disabled={saving || loading || !!fetchError} className="space-y-4">
+                            <div className="flex gap-2" role="group" aria-label="포인트 처리 방식">
+                                {[['add', '적립'], ['use', '사용']].map(([value, label]) => <button key={value} type="button" aria-pressed={action === value} onClick={() => { setAction(value); setNotice(null); }} className={`flex-1 p-3 rounded-xl text-sm font-bold border ${action === value ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-slate-200 text-slate-500'}`}>{label}</button>)}
                             </div>
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1">내용 / 사유</label>
-                                <input
-                                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
-                                    placeholder="예: 카드 적립, 마일리지 사용"
-                                    value={form.description}
-                                    onChange={e => setForm({ ...form, description: e.target.value })}
-                                />
+                            <div><label htmlFor="point-amount" className="block text-sm font-medium mb-2">{action === 'add' ? '적립' : '사용'}할 포인트 (P)</label>
+                                <input id="point-amount" type="number" min="1" max={action === 'use' ? balance : MAX_AMOUNT - balance} step="1" required value={form.amount} onChange={event => setForm({ ...form, amount: event.target.value })} aria-describedby="point-preview" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" placeholder="예: 1000" />
                             </div>
-                            <div className="flex gap-2 pt-2">
-                                <button 
-                                    onClick={() => handleAction('use')}
-                                    className="flex-1 bg-rose-50 hover:bg-rose-100 text-rose-600 p-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors"
-                                >
-                                    <MinusCircle className="w-5 h-5" /> 사용하기
-                                </button>
-                                <button 
-                                    onClick={() => handleAction('add')}
-                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition-colors"
-                                >
-                                    <PlusCircle className="w-5 h-5" /> 적립하기
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Side: History */}
-                <div className="lg:col-span-8">
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[500px]">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold flex items-center gap-2">
-                                <History className="w-5 h-5 text-indigo-600" /> {activeOwner} 포인트 내역
-                            </h3>
-                        </div>
-
-                        <div className="space-y-4">
-                            {history[activeOwner]?.length > 0 ? (
-                                history[activeOwner].map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-2xl hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${item.type === 'SAVE' ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'}`}>
-                                                {item.type === 'SAVE' ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-slate-800">{item.description}</p>
-                                                <p className="text-xs text-slate-400 font-medium">{new Date(item.createdAt).toLocaleString()}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className={`font-black text-lg ${item.type === 'SAVE' ? 'text-indigo-600' : 'text-rose-600'}`}>
-                                                {item.type === 'SAVE' ? '+' : ''}{item.amount.toLocaleString()} P
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="h-64 flex flex-col items-center justify-center text-slate-400 italic">
-                                    <History className="w-12 h-12 mb-3 opacity-20" />
-                                    최근 내역이 없습니다.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                            <div><label htmlFor="point-reason" className="block text-sm font-medium mb-2">내용 / 사유</label><input id="point-reason" required maxLength={255} value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" placeholder="예: 카드 적립, 마일리지 사용" /></div>
+                            <p id="point-preview" aria-live="polite" className={`rounded-xl p-3 text-sm ${insufficient || exceedsLimit ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-600'}`}>
+                                {insufficient ? '잔액보다 많은 포인트를 사용할 수 없습니다.' : exceedsLimit ? '적립 가능한 최대 잔액을 초과합니다.' : validAmount ? `처리 후 예상 잔액: ${projectedBalance.toLocaleString()} P` : '1 이상의 정수 포인트를 입력해주세요.'}
+                            </p>
+                            <button type="submit" disabled={!validAmount || insufficient || exceedsLimit || !form.description.trim()} className="primary-action w-full">{saving ? '처리 중…' : `${activeOwner} 포인트 ${action === 'add' ? '적립하기' : '사용하기'}`}</button>
+                        </fieldset>
+                    </form>
+                </section>
+                <section className="lg:col-span-8 min-w-0 bg-white p-6 rounded-2xl border border-slate-200">
+                    <h3 className="text-lg font-bold flex items-center gap-2 mb-5"><History size={20} />{activeOwner} 포인트 내역</h3>
+                    {loading ? <div className="empty-state" role="status">내역을 불러오는 중…</div> : fetchError ? <div className="empty-state">새로고침하면 최신 내역을 확인할 수 있습니다.</div> : history[activeOwner].length ? <ul className="space-y-3">
+                        {history[activeOwner].map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border border-slate-100">
+                            <div className="flex items-start gap-3 min-w-0 flex-1"><span className={`p-2 rounded-full shrink-0 ${item.amount >= 0 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>{item.amount >= 0 ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}</span><div className="min-w-0"><p className="font-medium">{item.description}</p><p className="text-xs text-slate-500 mt-1">{new Date(item.createdAt).toLocaleString('ko-KR')}</p></div></div>
+                            <p className={`font-bold tabular-nums ${item.amount >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>{item.amount > 0 ? '+' : ''}{item.amount.toLocaleString()} P</p>
+                        </li>)}
+                    </ul> : <div className="empty-state min-h-48"><History size={28} /><strong>아직 기록된 내역이 없습니다.</strong><p>첫 포인트를 적립해보세요.</p></div>}
+                </section>
             </div>
         </div>
     );

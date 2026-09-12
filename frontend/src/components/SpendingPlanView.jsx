@@ -1,8 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { getErrorMessage } from '../api/errorMessage';
+import { daysUntil, filterPlans } from '../utils/spending';
 import { spendingApi } from '../api/spendingApi';
 import { Calendar, PlusCircle, Trash2, Edit2, CheckCircle2, Clock } from 'lucide-react';
 
 const SpendingPlanView = () => {
+    const formRef = useRef(null);
+    const pending = useRef(false);
+    const [busyId, setBusyId] = useState(null);
+    const [statusFilter, setStatusFilter] = useState('unpaid');
+    const [query, setQuery] = useState('');
+    const [notice, setNotice] = useState('');
     const [plans, setPlans] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -32,7 +40,8 @@ const SpendingPlanView = () => {
         e.preventDefault();
         if (!form.title.trim() || form.amount === '' || !form.dueDate) return;
 
-        if (saving) return;
+        if (pending.current) return;
+        pending.current = true;
         setSaving(true);
         setError('');
         try {
@@ -41,26 +50,31 @@ const SpendingPlanView = () => {
             } else {
                 await spendingApi.createPlan(form);
             }
+            setNotice(editingId ? '지출 계획을 수정했습니다.' : '지출 계획을 등록했습니다.');
             setForm({ title: '', amount: '', dueDate: '', description: '', isPaid: false });
             setEditingId(null);
             await fetchPlans();
         } catch (err) {
             console.error(err);
-            setError('지출 계획 저장에 실패했습니다. 입력 내용은 유지됩니다.');
+            setError(getErrorMessage(err));
         } finally {
+            pending.current = false;
             setSaving(false);
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('정말 삭제하시겠습니까?')) return;
+        if (pending.current || !window.confirm('정말 삭제하시겠습니까?')) return;
+        pending.current = true;
+        setBusyId(id);
         try {
             await spendingApi.deletePlan(id);
-            fetchPlans();
+            setNotice('지출 계획을 삭제했습니다.');
+            await fetchPlans();
         } catch (err) {
             console.error(err);
-            setError('변경하지 못했습니다. 연결을 확인하고 다시 시도해주세요.');
-        }
+            setError(getErrorMessage(err));
+        } finally { pending.current = false; setBusyId(null); }
     };
 
     const handleEdit = (plan) => {
@@ -72,34 +86,31 @@ const SpendingPlanView = () => {
             description: plan.description || '',
             isPaid: plan.paid
         });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        formRef.current?.querySelector('input')?.focus({ preventScroll: true });
     };
 
     const togglePaid = async (plan) => {
+        if (pending.current) return;
+        pending.current = true;
+        setBusyId(plan.id);
         try {
             await spendingApi.updatePlan(plan.id, {
                 ...plan,
                 isPaid: !plan.paid
             });
-            fetchPlans();
+            setNotice(plan.paid ? '납부 완료를 취소했습니다.' : '납부 완료로 표시했습니다. 완료 목록에서 확인할 수 있습니다.');
+            await fetchPlans();
         } catch (err) {
             console.error(err);
-            setError('변경하지 못했습니다. 연결을 확인하고 다시 시도해주세요.');
-        }
+            setError(getErrorMessage(err));
+        } finally { pending.current = false; setBusyId(null); }
     };
 
-    const calculateDDay = (dueDate) => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const due = new Date(`${dueDate}T00:00:00`);
-        due.setHours(0, 0, 0, 0);
-        const diff = due - today;
-        const days = Math.round(diff / (1000 * 60 * 60 * 24));
-        return days;
-    };
+    const visiblePlans = filterPlans(plans, statusFilter, query);
 
     const getDDayColor = (days) => {
-        if (days < 0) return 'bg-slate-100 text-slate-400';
+        if (days < 0) return 'bg-red-50 text-red-700';
         if (days === 0) return 'bg-red-100 text-red-600 animate-pulse';
         if (days <= 3) return 'bg-red-50 text-red-500';
         if (days <= 7) return 'bg-amber-50 text-amber-600';
@@ -117,6 +128,7 @@ const SpendingPlanView = () => {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-32">
+            {notice && <div role="status" className="feedback success">{notice}</div>}
             {error && <div role="alert" className="feedback error"><span>{error}</span><button onClick={fetchPlans}>다시 불러오기</button></div>}
             <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-8 rounded-3xl shadow-lg text-white">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -143,16 +155,17 @@ const SpendingPlanView = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-4">
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 sticky top-24">
+                    <div ref={formRef} className="asset-form bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                         <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                             {editingId ? <Edit2 className="w-5 h-5 text-orange-500" /> : <PlusCircle className="w-5 h-5 text-emerald-600" />}
                             {editingId ? '지출 계획 수정' : '새 지출 계획 추가'}
                         </h3>
-                        <form onSubmit={handleSubmit} className="space-y-4"><fieldset disabled={saving} className="space-y-4">
+                        <form onSubmit={handleSubmit} className="space-y-4"><fieldset disabled={saving || busyId !== null} className="space-y-4">
+                            {notice && <p className="text-sm text-emerald-700">{notice}</p>}
                             {error && <p className="text-sm text-red-700">{error}</p>}
                             <div>
                                 <label htmlFor="SpendingPlanView-field-1" className="block text-xs font-bold text-slate-500 mb-1">지출 항목 명</label>
-                                <input id="SpendingPlanView-field-1"
+                                <input maxLength={100} id="SpendingPlanView-field-1"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl"
                                     placeholder="예: 실비보험, 주택청약"
                                     value={form.title}
@@ -173,7 +186,7 @@ const SpendingPlanView = () => {
                             <div>
                                 <label htmlFor="SpendingPlanView-field-3" className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label>
                                 <input id="SpendingPlanView-field-3"
-                                    type="number" min="0" step="1"
+                                    type="number" min="0" max={Number.MAX_SAFE_INTEGER} step="1"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-emerald-600"
                                     placeholder="0"
                                     value={form.amount}
@@ -183,7 +196,7 @@ const SpendingPlanView = () => {
                             </div>
                             <div>
                                 <label htmlFor="SpendingPlanView-field-4" className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label>
-                                <textarea id="SpendingPlanView-field-4"
+                                <textarea maxLength={255} id="SpendingPlanView-field-4"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm"
                                     value={form.description}
                                     onChange={e => setForm({ ...form, description: e.target.value })}
@@ -226,17 +239,24 @@ const SpendingPlanView = () => {
                             <Calendar className="w-5 h-5 text-emerald-600" /> 지출 예정 목록
                         </h3>
 
+                        {notice && <p className="text-sm text-emerald-700 mb-4">{notice}</p>}
+                        {error && <p className="text-sm text-red-700 mb-4">{error}</p>}
+                        <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="지출 상태 필터">
+                            {[['unpaid', '미납'], ['overdue', '기한 경과'], ['paid', '완료'], ['all', '전체']].map(([value, label]) => <button key={value} aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-4 py-2 rounded-xl text-sm font-bold ${statusFilter === value ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{label}</button>)}
+                        </div>
+                        <input type="search" aria-label="지출 검색" value={query} onChange={event => setQuery(event.target.value)} placeholder="지출 항목명, 메모 검색" className="w-full p-3 border border-slate-200 rounded-xl mb-3" />
+                        <p className="text-xs text-slate-500 mb-5">{visiblePlans.length}개 · 선택 목록 합계 ₩ {visiblePlans.reduce((sum, plan) => sum + Number(plan.amount), 0).toLocaleString()}</p>
                         <div className="space-y-4">
-                            {plans.length > 0 ? (
-                                plans.map((plan) => {
-                                    const dDay = calculateDDay(plan.dueDate);
+                            {visiblePlans.length > 0 ? (
+                                visiblePlans.map((plan) => {
+                                    const dDay = daysUntil(plan.dueDate);
                                     return (
-                                        <div key={plan.id} className={`group p-5 border rounded-2xl transition-all ${plan.paid ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md'}`}>
+                                        <div key={plan.id} className={`group p-5 border rounded-2xl transition-all ${plan.paid ? 'bg-slate-50 border-slate-100' : 'bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md'}`}>
                                             <div className="asset-row flex justify-between items-center gap-4">
                                                 <div className="flex gap-4">
-                                                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black ${getDDayColor(dDay)}`}>
+                                                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-black ${plan.paid ? 'bg-emerald-50 text-emerald-700' : getDDayColor(dDay)}`}>
                                                         <span className="text-[10px] uppercase">D-Day</span>
-                                                        <span className="text-lg">{dDay === 0 ? 'Day' : dDay > 0 ? `-${dDay}` : `+${Math.abs(dDay)}`}</span>
+                                                        <span className="text-lg">{plan.paid ? '완료' : dDay === 0 ? '오늘' : dDay > 0 ? `-${dDay}` : `+${Math.abs(dDay)}`}</span>
                                                     </div>
                                                     <div>
                                                         <div className="flex items-center gap-2">
@@ -255,14 +275,14 @@ const SpendingPlanView = () => {
                                                     <p className={`text-xl font-black ${plan.paid ? 'text-slate-400' : 'text-slate-900'}`}>₩ {Number(plan.amount).toLocaleString()}</p>
                                                     <div className="flex gap-2 mt-2">
                                                         <button
-                                                            onClick={() => togglePaid(plan)}
-                                                            className={`p-2 rounded-lg transition-colors ${plan.paid ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-300 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                                                            disabled={saving || busyId !== null} aria-label={`${plan.title} ${plan.paid ? '납부 취소' : '납부 완료'}`} onClick={() => togglePaid(plan)}
+                                                            className={`p-2 rounded-lg transition-colors ${plan.paid ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-500 hover:text-emerald-600 hover:bg-emerald-50'}`}
                                                             title={plan.paid ? "납부 취소" : "납부 완료"}
                                                         >
-                                                            <CheckCircle2 className="w-5 h-5" />
+                                                            <CheckCircle2 className="w-5 h-5 inline mr-1" /><span className="text-xs">{busyId === plan.id ? '처리 중…' : plan.paid ? '납부 취소' : '납부 완료'}</span>
                                                         </button>
-                                                        <button aria-label={`${plan.title} 수정`} onClick={() => handleEdit(plan)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
-                                                        <button aria-label={`${plan.title} 삭제`} onClick={() => handleDelete(plan.id)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                        <button disabled={saving || busyId !== null} aria-label={`${plan.title} 수정`} onClick={() => handleEdit(plan)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Edit2 className="w-4 h-4" /></button>
+                                                        <button disabled={saving || busyId !== null} aria-label={`${plan.title} 삭제`} onClick={() => handleDelete(plan.id)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -272,7 +292,7 @@ const SpendingPlanView = () => {
                             ) : !error ? (
                                 <div className="h-64 flex flex-col items-center justify-center text-slate-400 italic">
                                     <Calendar className="w-12 h-12 mb-3 opacity-20" />
-                                    등록된 지출 계획이 없습니다.
+                                    선택한 조건의 지출이 없습니다. 필터나 검색어를 바꿔보세요.
                                 </div>
                             ) : null}
                         </div>
