@@ -3,10 +3,12 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar, LabelList
 } from 'recharts';
-import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, Trash2, Edit2, Info, Building2, LayoutGrid, Lock, Lightbulb, Calendar, DollarSign, Search, ArrowRight, RefreshCw } from 'lucide-react';
+import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, Info, Building2, LayoutGrid, Lock, Lightbulb, Calendar, DollarSign, Search, ArrowRight, RefreshCw } from 'lucide-react';
 import ThoughtsView from './components/ThoughtsView';
 import SpendingPlanView from './components/SpendingPlanView';
 import PointsView from './components/PointsView';
+import AssetForm, { emptyAssetForm } from './components/AssetForm';
+import AssetCard from './components/AssetCard';
 import { useAssets } from './hooks/useAssets';
 import { getErrorMessage } from './api/errorMessage';
 import { assetApi } from './api/assetApi';
@@ -15,6 +17,7 @@ import { COLORS, INITIAL_CATEGORIES, APP_PASSWORD } from './constants/assetConst
 const App = () => {
   const {
     assets,
+    setAssets,
     history,
     loading,
     setLoading,
@@ -30,11 +33,10 @@ const App = () => {
   const [notice, setNotice] = useState(null);
   const focusForm = () => {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    formRef.current?.querySelector('[name=assetName]')?.focus({ preventScroll: true });
+    formRef.current?.querySelector('[data-asset-name]')?.focus({ preventScroll: true });
   };
 
-  const [form, setForm] = useState({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true });
-  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyAssetForm);
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'thoughts' | 'spending' | 'points'
 
   // Authentication state
@@ -97,19 +99,18 @@ const App = () => {
     e.preventDefault();
     if (loading) return;
     if (!form.name.trim() || form.amount === '' || !Number.isSafeInteger(Number(form.amount))) {
-      setNotice({ error: true, text: '자산명과 올바른 원 단위 금액을 입력해주세요.' });
+      setNotice({ scope: 'create', error: true, text: '자산명과 올바른 원 단위 금액을 입력해주세요.' });
       return;
     }
     setNotice(null);
     setLoading(true);
     try {
-      if (editingId) await assetApi.updateAsset(editingId, form);
-      else await assetApi.saveAsset(form);
-      setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true });
-      setEditingId(null);
-      setNotice({ text: editingId ? '자산 정보를 수정했습니다.' : '새 자산을 등록했습니다.' });
+      const response = await assetApi.saveAsset(form);
+      setAssets(previous => [...previous, response.data]);
+      setForm(emptyAssetForm());
+      setNotice({ scope: 'create', text: '새 자산을 등록했습니다.' });
       await refreshAssets();
-    } catch (error) { setNotice({ error: true, text: getErrorMessage(error) }); }
+    } catch (error) { setNotice({ scope: 'create', error: true, text: getErrorMessage(error) }); }
     finally { setLoading(false); }
   };
 
@@ -124,10 +125,14 @@ const App = () => {
     finally { setLoading(false); }
   };
 
-  const handleEdit = (asset) => {
-    setEditingId(asset.id);
-    setForm({ name: asset.name, amount: asset.amount, category: asset.category === 'LOAN' ? 'DEBT' : asset.category, platform: asset.platform || '', description: asset.description || '', liquid: asset.liquid });
-    focusForm();
+  const handleUpdateAsset = async (id, values) => {
+    setLoading(true);
+    try {
+      const response = await assetApi.updateAsset(id, values);
+      setAssets(previous => previous.map(asset => asset.id === id ? response.data : asset));
+      setNotice({ text: `${response.data.name} 자산 정보를 수정했습니다.` });
+      await refreshAssets();
+    } finally { setLoading(false); }
   };
 
   // 부동산/대출 필터링된 현재 자산 목록
@@ -364,35 +369,14 @@ const App = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-4 space-y-6">
               <div ref={formRef} className="asset-form bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">{editingId ? <Edit2 className="w-5 h-5 text-orange-500" /> : <PlusCircle className="w-5 h-5 text-blue-600" />}{editingId ? '자산 정보 수정' : '새 자산 등록'}</h3>
-                <form onSubmit={handleSubmit} className="space-y-4"><fieldset disabled={loading} className="space-y-4">
-                  {notice && <p className={`text-sm ${notice.error ? 'text-red-700' : 'text-emerald-700'}`}>{notice.text}</p>}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><label htmlFor="asset-field-1" className="block text-xs font-bold text-slate-500 mb-1">카테고리</label><select id="asset-field-1" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{Object.entries(INITIAL_CATEGORIES).map(([key, { label, emoji }]) => <option key={key} value={key}>{emoji} {label}</option>)}</select></div>
-                    <div><label htmlFor="asset-field-2" className="block text-xs font-bold text-slate-500 mb-1">플랫폼/금융사</label><input maxLength={255} id="asset-field-2" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm" placeholder="예: 국민은행, 미래에셋" value={form.platform} onChange={e => setForm({ ...form, platform: e.target.value })} /></div>
-                  </div>
-                  <div><label htmlFor="asset-field-3" className="block text-xs font-bold text-slate-500 mb-1">자산 명</label><input id="asset-field-3" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl" name="assetName" required maxLength={100} placeholder="예: 적금, 삼성전자" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-                  <div><label htmlFor="asset-field-4" className="block text-xs font-bold text-slate-500 mb-1">금액 (원)</label><input id="asset-field-4" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-blue-600" required step="1" type="number" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></div>
-                  <p className="text-xs text-slate-500">금액은 원 단위로 입력해주세요. 대출·부채는 자동으로 차감됩니다.</p><div><label htmlFor="asset-field-5" className="block text-xs font-bold text-slate-500 mb-1">상세 정보 (메모)</label><textarea maxLength={255} id="asset-field-5" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-20 text-sm" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-                  <div className="flex items-center gap-2 pt-2 px-1">
-                    <input
-                      id="isLiquid"
-                      type="checkbox"
-                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                      checked={form.liquid}
-                      onChange={e => setForm({ ...form, liquid: e.target.checked })}
-                    />
-                    <label htmlFor="isLiquid" className="text-sm font-bold text-slate-600 cursor-pointer select-none flex items-center gap-1">
-                      <DollarSign className="w-3 h-3" /> 현금화 가능 자산
-                    </label>
-                  </div>
-                  <div className="flex gap-2 pt-2">{editingId && <button type="button" onClick={() => { setEditingId(null); setForm({ name: '', amount: '', category: 'SAVINGS', platform: '', description: '', liquid: true }) }} className="flex-1 bg-slate-200 p-4 rounded-xl font-bold">취소</button>}<button disabled={loading} className={`flex-[2] p-4 rounded-xl font-bold text-white shadow-lg ${editingId ? 'bg-orange-500' : 'bg-blue-600'}`}>{loading ? '처리 중...' : editingId ? '수정 완료' : '등록하기'}</button></div>
-                </fieldset></form>
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><PlusCircle className="w-5 h-5 text-blue-600" />새 자산 등록</h3>
+                {notice?.scope === 'create' && <p className={`text-sm mb-4 ${notice.error ? 'text-red-700' : 'text-emerald-700'}`}>{notice.text}</p>}
+                <AssetForm id="asset-create" value={form} onChange={setForm} onSubmit={handleSubmit} disabled={loading} saving={loading} />
               </div>
             </div>
             <div className="lg:col-span-8">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[500px]">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div className="flex flex-col gap-4 mb-6">
                   <div className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">상세 자산 현황</h3></div>
                   <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 md:pb-0">
                     <button aria-pressed={selectedListCategory === 'TOTAL'} onClick={() => setSelectedListCategory('TOTAL')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedListCategory === 'TOTAL' ? 'bg-blue-600 text-white shadow-md cursor-default' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>전체 보기</button>
@@ -418,40 +402,7 @@ const App = () => {
                             </span>
                           </h4>
                           <div className="space-y-4">
-                            {catAssets.map((asset) => (
-                              <div key={asset.id}>
-                                  <div className={`group p-5 bg-white border rounded-2xl hover:shadow-md transition-all ${asset.liquid ? 'border-emerald-100 bg-emerald-50/10' : 'border-slate-100'}`}>
-                                    <div className="asset-row flex justify-between items-center gap-4">
-                                      <div className="flex gap-4">
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl relative ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-50' : 'bg-slate-50'}`}>
-                                          {INITIAL_CATEGORIES[asset.category]?.emoji}
-                                          {asset.liquid && (
-                                            <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full shadow-sm border border-white">
-                                              <DollarSign className="w-2.5 h-2.5" />
-                                            </div>
-                                          )}
-                                        </div>
-                                        <div>
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md ${INITIAL_CATEGORIES[asset.category]?.isLiability ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{asset.platform || '기타'}</span>
-                                            <h4 className="font-bold text-slate-800">{asset.name}</h4>
-                                            {asset.previousAmount > 0 && asset.amount !== asset.previousAmount && (
-                                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${asset.amount > asset.previousAmount ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                {asset.amount > asset.previousAmount ? '▲' : '▼'} {Math.abs(((asset.amount - asset.previousAmount) / asset.previousAmount) * 100).toFixed(1)}%
-                                              </span>
-                                            )}
-                                          </div>
-                                          <p className="text-sm text-slate-400 mt-1">{asset.description || '상세 정보 없음'}</p>
-                                        </div>
-                                      </div>
-                                      <div className="text-right flex flex-col items-end">
-                                        <p className={`text-xl font-black ${Number(asset.amount) < 0 ? 'text-red-600' : 'text-slate-900'}`}>₩ {Number(asset.amount).toLocaleString()}</p>
-                                        <div className="flex gap-2 mt-2  transition-opacity"><button disabled={loading} aria-label={`${asset.name} 수정`} onClick={() => handleEdit(asset)} className="p-2 text-slate-400 hover:text-blue-600" title="수정"><Edit2 className="w-4 h-4" /></button><button disabled={loading} aria-label={`${asset.name} 삭제`} onClick={() => handleDelete(asset.id)} className="p-2 text-slate-400 hover:text-red-600" title="삭제"><Trash2 className="w-4 h-4" /></button></div>
-                                      </div>
-                                    </div>
-                                  </div>
-                              </div>
-                            ))}
+                            {catAssets.map(asset => <AssetCard key={asset.id} asset={asset} busy={loading} onSave={handleUpdateAsset} onDelete={handleDelete} />)}
                           </div>
                         </div>
                       );
