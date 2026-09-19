@@ -9,6 +9,7 @@ import SpendingPlanView from './components/SpendingPlanView';
 import PointsView from './components/PointsView';
 import AssetForm, { emptyAssetForm } from './components/AssetForm';
 import AssetCard from './components/AssetCard';
+import CategoryTotals from './components/CategoryTotals';
 import { useAssets } from './hooks/useAssets';
 import { getErrorMessage } from './api/errorMessage';
 import { assetApi } from './api/assetApi';
@@ -28,6 +29,13 @@ const App = () => {
   } = useAssets();
 
   const formRef = useRef(null);
+  const assetListRef = useRef(null);
+  const selectCategoryTotal = category => {
+    setSelectedListCategory(category);
+    setSearch('');
+    assetListRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    assetListRef.current?.focus({ preventScroll: true });
+  };
   const changeTab = (tab) => { setActiveTab(tab); window.scrollTo({ top: 0 }); };
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState(null);
@@ -260,6 +268,7 @@ const App = () => {
             <article className="summary-card"><span className="summary-label"><DollarSign size={18} />현금화 가능 자산</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `₩ ${liquidTotal.toLocaleString()}`}</strong><p>현금화 가능으로 표시한 전체 자산 합계</p></article>
             <article className="summary-card"><span className="summary-label"><LayoutGrid size={18} />관리 중인 자산</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `${assets.length}개`}</strong><p>자산을 등록해 나만의 현황을 완성하세요</p></article>
           </section>
+          <CategoryTotals assets={assets} fetching={fetching} fetchError={fetchError} onSelect={selectCategoryTotal} />
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
               <div className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">순 자산 변화 추이</h3></div>
@@ -375,7 +384,7 @@ const App = () => {
               </div>
             </div>
             <div className="lg:col-span-8">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[500px]">
+              <div id="asset-list" ref={assetListRef} tabIndex={-1} aria-label="상세 자산 현황" className="asset-form bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[500px]">
                 <div className="flex flex-col gap-4 mb-6">
                   <div className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">상세 자산 현황</h3></div>
                   <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 md:pb-0">
