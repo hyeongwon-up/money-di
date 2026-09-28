@@ -2,6 +2,7 @@ import axios from './index';
 
 export const assetApi = {
   getAssets: () => axios.get('/api/assets', { timeout: 60000 }),
+  getItemHistory: () => axios.get('/api/assets/item-history', { timeout: 60000 }),
   getHistory: () => axios.get('/api/assets/history', { timeout: 60000 }),
   saveAsset: (form) => axios.post('/api/assets', form),
   updateAsset: (id, form) => axios.put(`/api/assets/${id}`, form),

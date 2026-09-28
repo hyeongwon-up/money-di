@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, BarChart, Bar, LabelList
 } from 'recharts';
 import { Wallet, TrendingUp, PieChart as PieChartIcon, PlusCircle, Info, Building2, LayoutGrid, Lock, Lightbulb, Calendar, DollarSign, Search, ArrowRight, RefreshCw } from 'lucide-react';
@@ -11,6 +11,7 @@ import AssetForm, { emptyAssetForm } from './components/AssetForm';
 import AssetCard from './components/AssetCard';
 import ExchangeRates from './components/ExchangeRates';
 import { assetPayload, validAssetAmount } from './utils/currency';
+import AssetTrend from './components/AssetTrend';
 import CategoryTotals from './components/CategoryTotals';
 import { useAssets } from './hooks/useAssets';
 import { getErrorMessage } from './api/errorMessage';
@@ -22,6 +23,8 @@ const App = () => {
     assets,
     setAssets,
     history,
+    itemHistory,
+    itemHistoryError,
     loading,
     setLoading,
     isServerOnline,
@@ -93,18 +96,6 @@ const App = () => {
 
   // 상세 자산 현황 리스트 카테고리 필터 상태
   const [selectedListCategory, setSelectedListCategory] = useState('TOTAL');
-
-  // 차트용 history 보정 (부동산/부채 제외 시 현재 부동산+부채 순가치를 차감하여 유동자산 추이 파악)
-  const realEstateAndDebtTotal = assets
-    .filter(a => a.category === 'REAL_ESTATE' || a.category === 'DEBT' || a.category === 'LOAN')
-    .reduce((sum, a) => sum + Number(a.amount), 0);
-
-  const chartHistory = history.map(h => {
-    if (!includeRealEstate) {
-      return { ...h, totalAmount: h.totalAmount - realEstateAndDebtTotal };
-    }
-    return h;
-  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -266,42 +257,21 @@ const App = () => {
           </header>
           {fetchError && <div role="alert" className="feedback error"><div><strong>자산 정보를 불러오지 못했습니다.</strong><p>서버가 시작 중일 수 있습니다. 15초 후 자동으로 다시 확인하며, 이전 데이터가 있으면 유지합니다.</p></div><button disabled={fetching} onClick={refreshAssets}><RefreshCw size={16} /> {fetching ? '확인 중' : '다시 시도'}</button></div>}
           {notice && <div role={notice.error ? 'alert' : 'status'} className={`feedback ${notice.error ? 'error' : 'success'}`}><span>{notice.text}</span><button onClick={() => setNotice(null)} aria-label="알림 닫기">닫기</button></div>}
+          <label className="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={includeRealEstate} onChange={e => setIncludeRealEstate(e.target.checked)} />현재 자산 요약·비중에 부동산/대출 포함 (추이 비교는 전체 기준)</label>
           <section className="summary-grid" aria-label="자산 요약" aria-busy={fetching}>
             <article className="summary-card featured"><span className="summary-label"><Wallet size={18} />{includeRealEstate ? '총 순자산' : '부동산·대출 제외 순자산'}</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `₩ ${totalAmount.toLocaleString()}`}</strong><p>{includeRealEstate ? '보유 자산에서 부채를 반영한 금액' : '부동산과 대출을 제외한 현재 금액'}</p></article>
             <article className="summary-card"><span className="summary-label"><DollarSign size={18} />현금화 가능 자산</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `₩ ${liquidTotal.toLocaleString()}`}</strong><p>현금화 가능으로 표시한 전체 자산 합계</p></article>
             <article className="summary-card"><span className="summary-label"><LayoutGrid size={18} />관리 중인 자산</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `${assets.length}개`}</strong><p>자산을 등록해 나만의 현황을 완성하세요</p></article>
           </section>
+          <AssetTrend history={history} assets={assets} itemHistory={itemHistory} itemHistoryError={itemHistoryError} fetching={fetching} fetchError={fetchError} onEditHistory={handleHistoryUpdate} onSelectAsset={asset => {
+            setSelectedListCategory(asset.category);
+            setSearch(asset.name);
+            assetListRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+            assetListRef.current?.focus({ preventScroll: true });
+          }} />
           <ExchangeRates rates={rates} rateLoading={rateLoading} rateError={rateError} refreshRates={refreshRates} />
           <CategoryTotals assets={assets} fetching={fetching} fetchError={fetchError} onSelect={selectCategoryTotal} />
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-              <div className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /><h3 className="text-xl font-bold">순 자산 변화 추이</h3></div>
-              <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-4 py-2 border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">
-                <input type="checkbox" className="w-4 h-4 text-blue-600 rounded cursor-pointer" checked={includeRealEstate} onChange={(e) => setIncludeRealEstate(e.target.checked)} />
-                <span className="text-sm font-bold text-slate-700">부동산/대출 포함 여부</span>
-              </label>
-            </div>
-            {!includeRealEstate && <p className="text-xs text-amber-700 mb-4">현재 부동산·대출 금액을 과거 기록에서 뺀 참고용 추이이며, 당시의 실제 금액과 다를 수 있습니다.</p>}
-            <div className="h-[200px] w-full">
-              {fetching || !chartHistory.length ? <div className="empty-state"><TrendingUp size={30} /><strong>{fetching ? '자산 기록을 불러오는 중입니다' : fetchError ? '연결 후 자산 추이를 확인할 수 있습니다' : '자산의 변화를 차곡차곡 기록해요'}</strong><p>자산을 등록하면 날짜별 순자산 추이가 표시됩니다.</p></div> : <>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartHistory}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="recordedDate" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(val) => `₩${(val / 100000000).toFixed(1)}억`} />
-                  <Tooltip formatter={(val) => `₩${Number(val).toLocaleString()}`} />
-                  <Line
-                    type="monotone"
-                    dataKey="totalAmount"
-                    stroke="#2563eb"
-                    strokeWidth={3}
-                    dot={{ fill: '#2563eb', r: 6, stroke: '#fff', strokeWidth: 2, cursor: 'pointer' }}
-                    activeDot={{ r: 8, stroke: '#2563eb', strokeWidth: 2, onClick: (e, payload) => handleHistoryUpdate(payload.payload) }}
-                  />
-                </LineChart>
-              </ResponsiveContainer></> }
-            </div>
-          </div>
+
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className="lg:col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">

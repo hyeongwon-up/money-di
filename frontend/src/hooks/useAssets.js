@@ -7,6 +7,8 @@ export const useAssets = () => {
   const pending = useRef(false);
   const exchange = useExchangeRates();
   const [assets, setAssets] = useState([]);
+  const [itemHistory, setItemHistory] = useState([]);
+  const [itemHistoryError, setItemHistoryError] = useState(false);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isServerOnline, setIsServerOnline] = useState(false);
@@ -19,12 +21,15 @@ export const useAssets = () => {
     setFetching(true);
     setFetchError(false);
     try {
-      const [assetRes, historyRes] = await Promise.all([
+      const [assetRes, historyRes, itemRes] = await Promise.all([
         assetApi.getAssets(),
-        assetApi.getHistory()
+        assetApi.getHistory(),
+        assetApi.getItemHistory().catch(() => null)
       ]);
       if (!Array.isArray(assetRes.data) || !Array.isArray(historyRes.data)) throw new Error('Invalid asset response');
       setAssets(assetRes.data.map(asset => ({ ...asset, category: asset.category === 'LOAN' ? 'DEBT' : asset.category })));
+      setItemHistoryError(!Array.isArray(itemRes?.data));
+      if (Array.isArray(itemRes?.data)) setItemHistory(itemRes.data);
       setIsServerOnline(true);
       setHistory(historyRes.data.sort((a, b) => new Date(a.recordedDate) - new Date(b.recordedDate)));
     } catch (error) {
@@ -67,6 +72,8 @@ export const useAssets = () => {
     ...exchange,
     assets: assets.map(asset => valueAsset(asset, exchange.rates)),
     setAssets,
+    itemHistory,
+    itemHistoryError,
     history,
     setHistory,
     loading,

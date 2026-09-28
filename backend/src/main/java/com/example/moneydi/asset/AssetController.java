@@ -22,6 +22,11 @@ public class AssetController {
         return assetService.getAllAssets();
     }
 
+    @GetMapping("/item-history")
+    public List<AssetItemHistory> itemHistory() {
+        return assetService.getAssetItemHistory();
+    }
+
     @GetMapping("/history")
     public List<AssetHistory> history() {
         return assetService.getAssetHistory();

@@ -58,4 +58,11 @@ class ApiContractTest {
                 .andExpect(status().isOk());
         verify(assets).saveAsset(argThat(asset -> asset.getId() == null && asset.getPreviousAmount() == 0L));
     }
+
+    @Test void exposesIndividualHistoryForPeriodComparison() throws Exception {
+        when(assets.getAssetItemHistory()).thenReturn(java.util.List.of(AssetItemHistory.builder()
+            .id(1L).assetId(7L).amount(1200L).recordedDate(java.time.LocalDate.of(2026, 9, 1)).build()));
+        mvc.perform(get("/api/assets/item-history")).andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].assetId").value(7)).andExpect(jsonPath("$[0].amount").value(1200));
+    }
 }

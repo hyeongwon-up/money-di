@@ -202,4 +202,17 @@ class AssetServiceTest {
         org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> assetService.saveAsset(asset));
         verifyNoInteractions(assetRepository);
     }
+
+    @Test void totalAndIndividualSnapshotsUseTheSameValuation() {
+        Asset first = new Asset(); first.setId(1L); first.setAmount(1000L); first.setCategory("SAVINGS");
+        Asset second = new Asset(); second.setId(2L); second.setAmount(-200L); second.setCategory("DEBT");
+        when(assetRepository.findAll()).thenReturn(List.of(first, second));
+        assetService.syncAssetsAndHistory();
+        var items = org.mockito.ArgumentCaptor.forClass(AssetItemHistory.class);
+        verify(assetItemHistoryRepository, times(2)).save(items.capture());
+        assertThat(items.getAllValues().stream().mapToLong(AssetItemHistory::getAmount).sum()).isEqualTo(800L);
+        var total = org.mockito.ArgumentCaptor.forClass(AssetHistory.class);
+        verify(assetHistoryRepository).save(total.capture());
+        assertThat(total.getValue().getTotalAmount()).isEqualTo(800L);
+    }
 }

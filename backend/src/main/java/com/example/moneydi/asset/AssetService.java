@@ -23,7 +23,6 @@ public class AssetService {
         normalizeAmount(asset);
         Asset saved = assetRepository.save(asset);
         refreshAllHistory(); // 전체 이력 재계산으로 정확도 보장
-        recordItemHistory(saved);
         return saved;
     }
 
@@ -36,9 +35,8 @@ public class AssetService {
     }
 
     private void refreshAllHistory() {
-        List<Asset> allAssets = assetRepository.findAll();
+        List<Asset> allAssets = assetRepository.findAll().stream().map(this::valuedCopy).toList();
         long totalAmount = allAssets.stream()
-                .map(this::valuedCopy)
                 .mapToLong(a -> a.getAmount() != null ? a.getAmount() : 0L)
                 .sum();
 
@@ -48,6 +46,8 @@ public class AssetService {
 
         history.setTotalAmount(totalAmount);
         assetHistoryRepository.save(history);
+        // Capture every current asset at the same valuation used for the total.
+        allAssets.forEach(asset -> recordItemHistory(asset, today));
     }
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
@@ -58,6 +58,11 @@ public class AssetService {
     @Transactional(readOnly = true)
     public List<AssetHistory> getAssetHistory() {
         return assetHistoryRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AssetItemHistory> getAssetItemHistory() {
+        return assetItemHistoryRepository.findAll();
     }
 
     public AssetHistory updateAssetHistory(Long id, AssetHistory history) {
@@ -100,7 +105,6 @@ public class AssetService {
         Asset updated = assetRepository.save(asset);
         
         refreshAllHistory();
-        recordItemHistory(updated);
         return updated;
     }
 
@@ -163,11 +167,11 @@ public class AssetService {
         refreshAllHistory();
     }
 
-    private void recordItemHistory(Asset asset) {
+    private void recordItemHistory(Asset asset, java.time.LocalDate recordedDate) {
         AssetItemHistory itemHistory = AssetItemHistory.builder()
                 .assetId(asset.getId())
                 .amount(asset.getAmount())
-                .recordedDate(java.time.LocalDate.now())
+                .recordedDate(recordedDate)
                 .build();
         assetItemHistoryRepository.save(itemHistory);
     }
