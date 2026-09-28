@@ -2,14 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { DollarSign, Edit2, Trash2 } from 'lucide-react';
 import { INITIAL_CATEGORIES } from '../constants/assetConstants';
 import { getErrorMessage } from '../api/errorMessage';
+import { validAssetAmount, rateTime } from '../utils/currency';
 import AssetForm from './AssetForm';
 
 const toDraft = asset => ({
-  name: asset.name, amount: asset.amount, category: asset.category === 'LOAN' ? 'DEBT' : asset.category,
+  name: asset.name, currency: asset.currency || 'KRW', amount: asset.foreignAmount ?? asset.amount, category: asset.category === 'LOAN' ? 'DEBT' : asset.category,
   platform: asset.platform || '', description: asset.description || '', liquid: !!asset.liquid
 });
 
-export default function AssetCard({ asset, busy, onSave, onDelete }) {
+export default function AssetCard({ asset, busy, onSave, onDelete, rates }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(asset));
   const [saving, setSaving] = useState(false);
@@ -31,8 +32,8 @@ export default function AssetCard({ asset, busy, onSave, onDelete }) {
   const handleSubmit = async event => {
     event.preventDefault();
     if (pending.current || busy) return;
-    if (!draft.name.trim() || draft.amount === '' || !Number.isSafeInteger(Number(draft.amount))) {
-      setNotice({ error: true, text: '자산명과 올바른 원 단위 금액을 입력해주세요.' });
+    if (!draft.name.trim() || !validAssetAmount(draft)) {
+      setNotice({ error: true, text: '자산명과 올바른 금액 또는 수량을 입력해주세요.' });
       return;
     }
     pending.current = true;
@@ -57,7 +58,8 @@ export default function AssetCard({ asset, busy, onSave, onDelete }) {
         </div>
         <div className="text-right flex flex-col items-end">
           <p className={`text-xl font-bold tabular-nums ${Number(asset.amount) < 0 ? 'text-red-600' : 'text-slate-900'}`}>₩ {Number(asset.amount).toLocaleString()}</p>
-          {asset.previousAmount > 0 && Number(asset.amount) !== Number(asset.previousAmount) && <span className="text-xs text-slate-500 mt-1">이전 대비 {Number(asset.amount) > Number(asset.previousAmount) ? '+' : '-'}{Math.abs((asset.amount - asset.previousAmount) / asset.previousAmount * 100).toFixed(1)}%</span>}
+          {asset.foreignAmount != null && <div className="text-xs text-slate-500 mt-1"><p>{Number(asset.foreignAmount).toLocaleString('ko-KR', { maximumFractionDigits: 8 })} {asset.currency}</p><p>{asset.exchangeRate?.available ? `1 ${asset.currency} = ₩ ${Number(asset.exchangeRate.rate).toLocaleString()} · ${rateTime(asset.exchangeRate)}${asset.exchangeRate.stale ? ' · 이전 시세' : ''}` : '시세 조회 불가 · 마지막 저장 평가액'}</p></div>}
+          {asset.foreignAmount == null && asset.previousAmount > 0 && Number(asset.amount) !== Number(asset.previousAmount) && <span className="text-xs text-slate-500 mt-1">이전 대비 {Number(asset.amount) > Number(asset.previousAmount) ? '+' : '-'}{Math.abs((asset.amount - asset.previousAmount) / asset.previousAmount * 100).toFixed(1)}%</span>}
           <div className="flex gap-2 mt-2">
             <button ref={editButtonRef} type="button" disabled={busy} aria-label={`${asset.name} 수정`} aria-expanded={editing} aria-controls={`asset-editor-${asset.id}`} onClick={() => { if (!editing) { setDraft(toDraft(asset)); setNotice(null); setEditing(true); } }} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold ${editing ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'}`}><Edit2 size={15} />{editing ? '수정 중' : '수정'}</button>
             {!editing && <button type="button" disabled={busy} aria-label={`${asset.name} 삭제`} onClick={() => onDelete(asset.id)} className="px-2 py-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"><Trash2 size={16} /></button>}
@@ -66,7 +68,7 @@ export default function AssetCard({ asset, busy, onSave, onDelete }) {
       </div>
       {notice && <p role={notice.error ? 'alert' : 'status'} className={`text-sm mt-4 rounded-lg p-3 ${notice.error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{notice.text}</p>}
       <div id={`asset-editor-${asset.id}`}>
-        {editing ? <div className="border-t border-blue-100 mt-4 pt-5"><h5 className="text-sm font-bold text-blue-800 mb-4">이 카드에서 자산 수정</h5><AssetForm id={`asset-edit-${asset.id}`} value={draft} onChange={setDraft} onSubmit={handleSubmit} onCancel={() => { setNotice(null); finishEditing(); }} editing disabled={busy || saving} saving={saving} /></div> : asset.description && <p className="text-sm text-slate-500 whitespace-pre-wrap mt-3">{asset.description}</p>}
+        {editing ? <div className="border-t border-blue-100 mt-4 pt-5"><h5 className="text-sm font-bold text-blue-800 mb-4">이 카드에서 자산 수정</h5><AssetForm rates={rates} id={`asset-edit-${asset.id}`} value={draft} onChange={setDraft} onSubmit={handleSubmit} onCancel={() => { setNotice(null); finishEditing(); }} editing disabled={busy || saving} saving={saving} /></div> : asset.description && <p className="text-sm text-slate-500 whitespace-pre-wrap mt-3">{asset.description}</p>}
       </div>
     </article>
   );

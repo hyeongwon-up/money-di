@@ -9,6 +9,8 @@ import SpendingPlanView from './components/SpendingPlanView';
 import PointsView from './components/PointsView';
 import AssetForm, { emptyAssetForm } from './components/AssetForm';
 import AssetCard from './components/AssetCard';
+import ExchangeRates from './components/ExchangeRates';
+import { assetPayload, validAssetAmount } from './utils/currency';
 import CategoryTotals from './components/CategoryTotals';
 import { useAssets } from './hooks/useAssets';
 import { getErrorMessage } from './api/errorMessage';
@@ -25,7 +27,8 @@ const App = () => {
     isServerOnline,
     refreshAssets,
     fetching,
-    fetchError
+    fetchError,
+    rates, rateLoading, rateError, refreshRates,
   } = useAssets();
 
   const formRef = useRef(null);
@@ -106,14 +109,14 @@ const App = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
-    if (!form.name.trim() || form.amount === '' || !Number.isSafeInteger(Number(form.amount))) {
-      setNotice({ scope: 'create', error: true, text: '자산명과 올바른 원 단위 금액을 입력해주세요.' });
+    if (!form.name.trim() || !validAssetAmount(form)) {
+      setNotice({ scope: 'create', error: true, text: '자산명과 올바른 금액 또는 수량을 입력해주세요.' });
       return;
     }
     setNotice(null);
     setLoading(true);
     try {
-      const response = await assetApi.saveAsset(form);
+      const response = await assetApi.saveAsset(assetPayload(form));
       setAssets(previous => [...previous, response.data]);
       setForm(emptyAssetForm());
       setNotice({ scope: 'create', text: '새 자산을 등록했습니다.' });
@@ -136,7 +139,7 @@ const App = () => {
   const handleUpdateAsset = async (id, values) => {
     setLoading(true);
     try {
-      const response = await assetApi.updateAsset(id, values);
+      const response = await assetApi.updateAsset(id, assetPayload(values));
       setAssets(previous => previous.map(asset => asset.id === id ? response.data : asset));
       setNotice({ text: `${response.data.name} 자산 정보를 수정했습니다.` });
       await refreshAssets();
@@ -261,13 +264,14 @@ const App = () => {
             <div><p className="eyebrow">MY FINANCIAL OVERVIEW</p><h2>내 자산 한눈에 보기</h2><p className="text-slate-500 text-sm mt-2">흩어진 자산을 모아보고, 다음 계획을 세워보세요.</p></div>
             <button className="primary-action" onClick={focusForm}><PlusCircle size={18} /> 자산 등록 <ArrowRight size={16} /></button>
           </header>
-          {fetchError && <div role="alert" className="feedback error"><div><strong>자산 정보를 불러오지 못했습니다.</strong><p>연결을 확인해주세요. 이전에 불러온 데이터가 있다면 그대로 표시합니다.</p></div><button disabled={fetching} onClick={refreshAssets}><RefreshCw size={16} /> {fetching ? '확인 중' : '다시 시도'}</button></div>}
+          {fetchError && <div role="alert" className="feedback error"><div><strong>자산 정보를 불러오지 못했습니다.</strong><p>서버가 시작 중일 수 있습니다. 15초 후 자동으로 다시 확인하며, 이전 데이터가 있으면 유지합니다.</p></div><button disabled={fetching} onClick={refreshAssets}><RefreshCw size={16} /> {fetching ? '확인 중' : '다시 시도'}</button></div>}
           {notice && <div role={notice.error ? 'alert' : 'status'} className={`feedback ${notice.error ? 'error' : 'success'}`}><span>{notice.text}</span><button onClick={() => setNotice(null)} aria-label="알림 닫기">닫기</button></div>}
           <section className="summary-grid" aria-label="자산 요약" aria-busy={fetching}>
             <article className="summary-card featured"><span className="summary-label"><Wallet size={18} />{includeRealEstate ? '총 순자산' : '부동산·대출 제외 순자산'}</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `₩ ${totalAmount.toLocaleString()}`}</strong><p>{includeRealEstate ? '보유 자산에서 부채를 반영한 금액' : '부동산과 대출을 제외한 현재 금액'}</p></article>
             <article className="summary-card"><span className="summary-label"><DollarSign size={18} />현금화 가능 자산</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `₩ ${liquidTotal.toLocaleString()}`}</strong><p>현금화 가능으로 표시한 전체 자산 합계</p></article>
             <article className="summary-card"><span className="summary-label"><LayoutGrid size={18} />관리 중인 자산</span><strong>{fetching ? '불러오는 중…' : fetchError && !assets.length ? '확인 필요' : `${assets.length}개`}</strong><p>자산을 등록해 나만의 현황을 완성하세요</p></article>
           </section>
+          <ExchangeRates rates={rates} rateLoading={rateLoading} rateError={rateError} refreshRates={refreshRates} />
           <CategoryTotals assets={assets} fetching={fetching} fetchError={fetchError} onSelect={selectCategoryTotal} />
           <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
@@ -380,7 +384,7 @@ const App = () => {
               <div ref={formRef} className="asset-form bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><PlusCircle className="w-5 h-5 text-blue-600" />새 자산 등록</h3>
                 {notice?.scope === 'create' && <p className={`text-sm mb-4 ${notice.error ? 'text-red-700' : 'text-emerald-700'}`}>{notice.text}</p>}
-                <AssetForm id="asset-create" value={form} onChange={setForm} onSubmit={handleSubmit} disabled={loading} saving={loading} />
+                <AssetForm rates={rates} id="asset-create" value={form} onChange={setForm} onSubmit={handleSubmit} disabled={loading} saving={loading} />
               </div>
             </div>
             <div className="lg:col-span-8">
@@ -411,7 +415,7 @@ const App = () => {
                             </span>
                           </h4>
                           <div className="space-y-4">
-                            {catAssets.map(asset => <AssetCard key={asset.id} asset={asset} busy={loading} onSave={handleUpdateAsset} onDelete={handleDelete} />)}
+                            {catAssets.map(asset => <AssetCard rates={rates} key={asset.id} asset={asset} busy={loading} onSave={handleUpdateAsset} onDelete={handleDelete} />)}
                           </div>
                         </div>
                       );

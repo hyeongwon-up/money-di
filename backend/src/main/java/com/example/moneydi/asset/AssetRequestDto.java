@@ -7,6 +7,8 @@ import lombok.Data;
 public class AssetRequestDto {
     private String name;
     private Long amount;
+    private String currency;
+    private java.math.BigDecimal foreignAmount;
     private String category;
     private String platform;
     private String description;
@@ -16,6 +18,8 @@ public class AssetRequestDto {
         Asset asset = new Asset();
         asset.setName(name);
         asset.setAmount(amount);
+        asset.setCurrency(currency);
+        asset.setForeignAmount(foreignAmount);
         asset.setCategory(category);
         asset.setPlatform(platform);
         asset.setDescription(description);

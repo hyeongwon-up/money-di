@@ -27,6 +27,8 @@ class AssetServiceTest {
     @Mock
     private AssetItemHistoryRepository assetItemHistoryRepository;
 
+    @Mock private com.example.moneydi.exchange.ExchangeRateService exchangeRates;
+
     @InjectMocks
     private AssetService assetService;
 
@@ -167,5 +169,37 @@ class AssetServiceTest {
         asset.setCategory("SAVINGS");
         org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> assetService.saveAsset(asset));
         verifyNoInteractions(assetRepository, assetHistoryRepository, assetItemHistoryRepository);
+    }
+
+    @Test void foreignAmountIsConvertedOnServerAndDebtIsNegative() {
+        var quote = new com.example.moneydi.exchange.ExchangeRate();
+        quote.setAvailable(true); quote.setRate(new java.math.BigDecimal("1401"));
+        when(exchangeRates.get("USDT")).thenReturn(quote);
+        when(assetRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        Asset asset = new Asset(); asset.setName("테더 부채"); asset.setCategory("DEBT");
+        asset.setCurrency("USDT"); asset.setForeignAmount(new java.math.BigDecimal("1.5"));
+        asset.setAmount(999999L); // Never trust a client-supplied KRW conversion.
+        assertThat(assetService.saveAsset(asset).getAmount()).isEqualTo(-2102L);
+        assertThat(asset.getForeignAmount()).isEqualByComparingTo("1.5");
+    }
+    @Test void readingLatestValuationDoesNotMutatePersistedAssetOrHistory() {
+        var quote = new com.example.moneydi.exchange.ExchangeRate();
+        quote.setAvailable(true); quote.setRate(new java.math.BigDecimal("1500"));
+        when(exchangeRates.get("USD")).thenReturn(quote);
+        Asset asset = new Asset(); asset.setCurrency("USD"); asset.setCategory("STOCK");
+        asset.setForeignAmount(new java.math.BigDecimal("2")); asset.setAmount(2800L);
+        when(assetRepository.findAll()).thenReturn(List.of(asset));
+        assertThat(assetService.getAllAssets().get(0).getAmount()).isEqualTo(3000L);
+        assertThat(asset.getAmount()).isEqualTo(2800L);
+        verifyNoInteractions(assetHistoryRepository, assetItemHistoryRepository);
+    }
+    @Test void foreignAssetRequiresAQuoteAndRejectsExcessPrecision() {
+        Asset asset = new Asset(); asset.setName("달러"); asset.setCategory("SAVINGS");
+        asset.setCurrency("USD"); asset.setForeignAmount(new java.math.BigDecimal("1.123456789"));
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> assetService.saveAsset(asset));
+        asset.setForeignAmount(java.math.BigDecimal.ONE);
+        when(exchangeRates.get("USD")).thenReturn(new com.example.moneydi.exchange.ExchangeRate());
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException().isThrownBy(() -> assetService.saveAsset(asset));
+        verifyNoInteractions(assetRepository);
     }
 }

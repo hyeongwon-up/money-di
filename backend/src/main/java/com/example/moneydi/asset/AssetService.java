@@ -13,6 +13,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional
 public class AssetService {
+    private final com.example.moneydi.exchange.ExchangeRateService exchangeRates;
     private final AssetRepository assetRepository;
     private final AssetHistoryRepository assetHistoryRepository;
     private final AssetItemHistoryRepository assetItemHistoryRepository;
@@ -37,6 +38,7 @@ public class AssetService {
     private void refreshAllHistory() {
         List<Asset> allAssets = assetRepository.findAll();
         long totalAmount = allAssets.stream()
+                .map(this::valuedCopy)
                 .mapToLong(a -> a.getAmount() != null ? a.getAmount() : 0L)
                 .sum();
 
@@ -48,9 +50,9 @@ public class AssetService {
         assetHistoryRepository.save(history);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public List<Asset> getAllAssets() {
-        return assetRepository.findAll();
+        return assetRepository.findAll().stream().map(this::valuedCopy).toList();
     }
 
     @Transactional(readOnly = true)
@@ -85,6 +87,8 @@ public class AssetService {
             asset.setPreviousAmount(asset.getAmount());
         }
 
+        asset.setCurrency(assetDetails.getCurrency());
+        asset.setForeignAmount(assetDetails.getForeignAmount());
         asset.setName(assetDetails.getName());
         asset.setAmount(assetDetails.getAmount());
         asset.setCategory(assetDetails.getCategory());
@@ -102,12 +106,45 @@ public class AssetService {
 
     private void validateAsset(Asset asset) {
         asset.setName(InputChecks.requiredText(asset.getName(), "자산명", 100));
+        String currency = asset.getCurrency() == null ? "KRW" : asset.getCurrency();
+        if (!Set.of("KRW", "USD", "USDT").contains(currency)) throw new IllegalArgumentException("지원하지 않는 통화입니다.");
+        asset.setCurrency(currency);
+        if ("KRW".equals(currency)) {
+            asset.setForeignAmount(null);
+        } else {
+            var quantity = asset.getForeignAmount();
+            if (quantity == null || quantity.signum() < 0 || quantity.stripTrailingZeros().scale() > 8 || quantity.compareTo(java.math.BigDecimal.valueOf(1000000000000L)) > 0)
+                throw new IllegalArgumentException("외화 수량은 0 이상 1조 이하, 소수점 8자리까지 입력해주세요.");
+            revalue(asset, true);
+        }
         InputChecks.amount(asset.getAmount(), -InputChecks.MAX_AMOUNT);
         if (asset.getCategory() == null || !Set.of("SAVINGS", "INSTALLMENT", "STOCK", "CRYPTO", "REAL_ESTATE", "DEBT", "LOAN", "OTHER").contains(asset.getCategory())) {
             throw new IllegalArgumentException("올바른 자산 카테고리를 선택해주세요.");
         }
         asset.setPlatform(InputChecks.optionalText(asset.getPlatform(), "플랫폼", 255));
         asset.setDescription(InputChecks.optionalText(asset.getDescription(), "메모", 255));
+    }
+
+    private Asset valuedCopy(Asset source) {
+        Asset copy = new Asset();
+        org.springframework.beans.BeanUtils.copyProperties(source, copy);
+        revalue(copy, false);
+        normalizeAmount(copy);
+        return copy;
+    }
+
+    private void revalue(Asset asset, boolean required) {
+        if (asset.getCurrency() == null || "KRW".equals(asset.getCurrency())) return;
+        var quote = exchangeRates.get(asset.getCurrency());
+        asset.setExchangeRate(quote);
+        if (!quote.isAvailable()) {
+            if (required) throw new IllegalArgumentException("환율을 아직 불러오지 못했습니다. 잠시 후 다시 저장해주세요.");
+            return; // Keep the last saved KRW value, never substitute zero.
+        }
+        var converted = asset.getForeignAmount().multiply(quote.getRate()).setScale(0, java.math.RoundingMode.HALF_UP);
+        if (converted.abs().compareTo(java.math.BigDecimal.valueOf(InputChecks.MAX_AMOUNT)) > 0)
+            throw new IllegalArgumentException("원화 환산액이 지원 범위를 초과합니다.");
+        asset.setAmount(converted.longValueExact());
     }
 
     private void normalizeAmount(Asset asset) {

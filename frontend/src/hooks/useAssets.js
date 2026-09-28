@@ -1,7 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useExchangeRates } from './useExchangeRates';
+import { valueAsset } from '../utils/currency';
 import { assetApi } from '../api/assetApi';
 
 export const useAssets = () => {
+  const pending = useRef(false);
+  const exchange = useExchangeRates();
   const [assets, setAssets] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -10,6 +14,8 @@ export const useAssets = () => {
   const [fetchError, setFetchError] = useState(false);
 
   const fetchData = useCallback(async () => {
+    if (pending.current) return;
+    pending.current = true;
     setFetching(true);
     setFetchError(false);
     try {
@@ -26,6 +32,7 @@ export const useAssets = () => {
       setFetchError(true);
       setIsServerOnline(false);
     } finally {
+      pending.current = false;
       setFetching(false);
     }
   }, []);
@@ -46,10 +53,19 @@ export const useAssets = () => {
     return () => clearInterval(interval);
   }, [fetchData, checkHealth]);
 
+  useEffect(() => {
+    if (!fetchError) return;
+    const timer = setTimeout(() => { if (!document.hidden) fetchData(); }, 15000);
+    const visible = () => { if (!document.hidden) fetchData(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
+  }, [fetchError, fetching, fetchData]);
+
   return {
     fetching,
     fetchError,
-    assets,
+    ...exchange,
+    assets: assets.map(asset => valueAsset(asset, exchange.rates)),
     setAssets,
     history,
     setHistory,

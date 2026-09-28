@@ -18,7 +18,13 @@ public class Asset {
     private Long id;
 
     private String name;
-    private Long amount;
+    private Long amount; // KRW valuation at the last save; existing rows remain KRW.
+    private String currency;
+    @jakarta.persistence.Column(precision = 24, scale = 8)
+    @com.fasterxml.jackson.annotation.JsonFormat(shape = com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
+    private java.math.BigDecimal foreignAmount;
+    @jakarta.persistence.Transient
+    private com.example.moneydi.exchange.ExchangeRate exchangeRate;
     private Long previousAmount = 0L; // 이전 금액 추가
     private String category;    // SAVINGS, INSTALLMENT, STOCK, CRYPTO, REAL_ESTATE
     private String platform;    // 플랫폼(은행, 증권사 등)
